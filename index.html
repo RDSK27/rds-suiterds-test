@@ -162,6 +162,9 @@ if('serviceWorker' in navigator){
   .champ-form{border:2px solid var(--rojo);border-radius:10px;padding:14px;margin-bottom:14px;background:#fff8f7;}
   .champ-form label{display:block;font-size:10.5px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:#888;margin:10px 0 4px;}
   .champ-form input[type=text]{width:100%;padding:9px 10px;border:2px solid var(--borde);border-radius:6px;font-size:13px;font-family:inherit;}
+  .champ-title-row{display:flex;align-items:center;gap:8px;}
+  .champ-title-row .champ-num-prefix{flex:none;font-weight:900;font-size:13px;color:var(--negro);white-space:nowrap;}
+  .champ-title-row input[type=text]{flex:1;min-width:0;}
   .prueba-row{display:flex;gap:6px;align-items:center;margin-bottom:6px;}
   .prueba-row select, .prueba-row input{flex:1;min-width:0;padding:7px 6px;border:2px solid var(--borde);border-radius:6px;font-size:12px;font-family:inherit;}
   .prueba-row select.tipo{flex:0 0 88px;}
@@ -238,7 +241,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v12</div>
+    <div class="app-ver">v13</div>
   </footer>
 
 </div>
@@ -658,6 +661,20 @@ function renderAdminLogin(){
 /* ---------- Campeonatos: listado ---------- */
 var CHAMPS=[];
 function tipoLabel(t){ return t==='avg' ? 'Valor' : 'Posici&#243;n'; }
+/* Numeracion automatica de campeonatos (2026-09-28): cada campeonato nuevo
+   recibe el siguiente numero libre (maximo actual + 1) al crearse, fijo de
+   por vida -- no se recalcula al editar ni al borrar otros. El nombre que
+   se ve siempre es "Campeonato N - <titulo>"; los campeonatos antiguos sin
+   "number" (creados antes de este cambio) se siguen viendo solo con su
+   titulo, sin numero. */
+function nextChampNumber(){
+  var max=0;
+  CHAMPS.forEach(function(c){ if(c.number>max) max=c.number; });
+  return max+1;
+}
+function champFullName(c){
+  return c.number ? ('Campeonato '+c.number+' - '+(c.title||'')) : (c.title||'');
+}
 function appNameOf(slug){ var a=APPS.filter(function(x){ return x.slug===slug; })[0]; return a?a.name:slug; }
 function renderChampList(){
   var host=$('champList');
@@ -673,7 +690,7 @@ function renderChampList(){
       var nm=(adapter && adapter.dims && e.dimValues) ? (adapter.name+' &middot; '+esc(adapter.dimLabel(e.dimValues))) : appNameOf(e.app);
       return nm+' ('+tipoLabel(e.tipo)+')';
     }).join('<br>');
-    card.innerHTML='<h3>'+esc(c.title)+'</h3>'
+    card.innerHTML='<h3>'+esc(champFullName(c))+'</h3>'
       +'<div class="pruebas">'+pruebasTxt+'</div>'
       +'<button class="champ-open" data-id="'+c.id+'">Ver tabla</button>'
       +(isAdmin()?('<div class="champ-actions"><button class="edit" data-id="'+c.id+'">Editar</button><button class="danger del" data-id="'+c.id+'">Borrar</button></div>'):'');
@@ -686,6 +703,7 @@ function renderChampList(){
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 async function loadChamps(){
   CHAMPS = window.hubLoadChamps ? (await window.hubLoadChamps()) : [];
+  CHAMPS.sort(function(a,b){ return (a.number||0)-(b.number||0) || (a.createdAt||0)-(b.createdAt||0); });
   renderChampList();
 }
 
@@ -750,7 +768,7 @@ async function openChampTable(id){
   var view=$('champTableView');
   view.style.display='';
   view.innerHTML='<button class="champ-table-back" id="btnBackChamp">&larr; Volver a Campeonatos</button>'
-    +'<div class="champ-table-title">'+esc(c.title)+'</div>'
+    +'<div class="champ-table-title">'+esc(champFullName(c))+'</div>'
     +'<div class="hint" style="padding:6px 0 14px;">Calculando&hellip;</div>';
   $('btnBackChamp').addEventListener('click', closeChampTable);
   try{
@@ -770,14 +788,14 @@ function paintChampTable(c, data){
   var view=$('champTableView');
   if(!data.columns.length){
     view.innerHTML='<button class="champ-table-back" id="btnBackChamp">&larr; Volver a Campeonatos</button>'
-      +'<div class="champ-table-title">'+esc(c.title)+'</div>'
+      +'<div class="champ-table-title">'+esc(champFullName(c))+'</div>'
       +'<div class="hint">Este campeonato no tiene pruebas validas todavía.</div>';
     $('btnBackChamp').addEventListener('click', closeChampTable);
     return;
   }
   if(!data.rows.length){
     view.innerHTML='<button class="champ-table-back" id="btnBackChamp">&larr; Volver a Campeonatos</button>'
-      +'<div class="champ-table-title">'+esc(c.title)+'</div>'
+      +'<div class="champ-table-title">'+esc(champFullName(c))+'</div>'
       +'<div class="hint">Todavía no hay marcas guardadas en ninguna de estas pruebas.</div>';
     $('btnBackChamp').addEventListener('click', closeChampTable);
     return;
@@ -798,15 +816,15 @@ function paintChampTable(c, data){
     tbody+='<td class="champ-pts-cell">'+row.points+'</td></tr>';
   });
   view.innerHTML='<button class="champ-table-back" id="btnBackChamp">&larr; Volver a Campeonatos</button>'
-    +'<div class="champ-table-title">'+esc(c.title)+'</div>'
+    +'<div class="champ-table-title">'+esc(champFullName(c))+'</div>'
     +'<div class="hint" style="padding:0 0 10px;text-align:left;">"Total" son puntos MotoGP seg&uacute;n el puesto en cada prueba (aunque la columna ense&ntilde;e el valor bruto).</div>'
     +'<div class="champ-table-scroll"><table class="champ-table"><thead>'+thead+'</thead><tbody>'+tbody+'</tbody></table></div>';
   $('btnBackChamp').addEventListener('click', closeChampTable);
 }
 
 /* ---------- Campeonatos: crear / editar ---------- */
-var FORM_ENTRIES=[], FORM_EDIT_ID=null;
-function closeChampForm(){ $('champForm').innerHTML=''; FORM_ENTRIES=[]; FORM_EDIT_ID=null; }
+var FORM_ENTRIES=[], FORM_EDIT_ID=null, FORM_CHAMP_NUMBER=null;
+function closeChampForm(){ $('champForm').innerHTML=''; FORM_ENTRIES=[]; FORM_EDIT_ID=null; FORM_CHAMP_NUMBER=null; }
 function openChampForm(editId){
   if(!isAdmin()) return;
   FORM_EDIT_ID = editId || null;
@@ -816,10 +834,13 @@ function openChampForm(editId){
     if(copy.dimValues) copy.dimValues=Object.assign({}, copy.dimValues);   // copia aparte, no tocar el original hasta Guardar
     return copy;
   }) : [];
+  var champNumber = existing ? (existing.number || nextChampNumber()) : nextChampNumber();
+  FORM_CHAMP_NUMBER = champNumber;
   var box=$('champForm');
   box.innerHTML='<div class="champ-form">'
     +'<label>T&#237;tulo</label>'
-    +'<input type="text" id="champTitleInput" placeholder="p. ej. Resistencia" value="'+esc(existing?existing.title:'')+'">'
+    +'<div class="champ-title-row"><span class="champ-num-prefix">Campeonato '+champNumber+' -</span>'
+    +'<input type="text" id="champTitleInput" placeholder="p. ej. MixMS" value="'+esc(existing?existing.title:'')+'"></div>'
     +'<label>Pruebas</label>'
     +'<div id="pruebaRows"></div>'
     +'<button type="button" class="add-prueba" id="btnAddPrueba">+ A&#241;adir prueba</button>'
@@ -894,7 +915,7 @@ async function saveChampForm(){
   var rec={ title:title, entries:FORM_ENTRIES, adminKey:ADMIN_KEY, updatedAt:Date.now() };
   try{
     if(FORM_EDIT_ID){ await window.hubUpdateChamp(FORM_EDIT_ID, rec); }
-    else { rec.createdAt=Date.now(); await window.hubAddChamp(rec); }
+    else { rec.number=FORM_CHAMP_NUMBER; rec.createdAt=Date.now(); await window.hubAddChamp(rec); }
     closeChampForm();
     await loadChamps();
   }catch(e){ alert('No se pudo guardar. Comprueba la conexión o las reglas de Firestore.'); }
