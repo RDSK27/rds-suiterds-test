@@ -238,7 +238,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v11</div>
+    <div class="app-ver">v12</div>
   </footer>
 
 </div>
@@ -328,7 +328,19 @@ var APPS=[
   { slug:'rds-reactionkarate-test',   name:'Reaction Karate',   icon:'icons/rds-reactionkarate-test.png' },
   { slug:'rds-reactiontrial-test',    name:'Reaction Trial',    icon:'icons/rds-reactiontrial-test.png' }
 ];
-function appUrl(slug){ return 'https://rdsk27.github.io/'+slug+'/'; }
+/* Si ya me he marcado ("quien soy"), se pasa por la URL al abrir la app --
+   cada una de las 12 sabe leer ?ini=&dep= (2026-09-28) y se autorrellena/
+   resalta como si lo hubiera escrito alli mismo. Sin marcar, URL normal. */
+function appUrl(slug){
+  var url='https://rdsk27.github.io/'+slug+'/';
+  var me=getMe();
+  if(me){
+    var parts=me.split('-');
+    var ini=parts[0]||'', dep=parts.slice(1).join('-')||'';
+    url += '?ini='+encodeURIComponent(ini)+'&dep='+encodeURIComponent(dep);
+  }
+  return url;
+}
 
 /* ---------- Pestanas ---------- */
 function showTab(id){
@@ -378,6 +390,7 @@ function setMe(ini, dep){
   var v=(ini||'').trim().toUpperCase().replace(/[^A-Z]/g,'').slice(0,3)+'-'+(dep||'OTR');
   try{ localStorage.setItem(ME_LS, v); }catch(e){}
   renderMeBar();
+  renderAppGrid();   // los botones de Rankings ya llevan la identidad nueva en la URL
 }
 function renderMeBar(){
   var host=$('meBar'), me=getMe();
