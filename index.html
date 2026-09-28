@@ -222,7 +222,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v9</div>
+    <div class="app-ver">v10</div>
   </footer>
 
 </div>
@@ -462,7 +462,6 @@ function dedupeBest(docs, metric, better){
    6, 5, 4, 3, 2, 1 -- hasta el 15o puesto, 0 a partir de ahi. */
 var MOTOGP_POINTS=[25,20,16,13,11,10,9,8,7,6,5,4,3,2,1];
 function pointsFor(pos){ return pos<MOTOGP_POINTS.length ? MOTOGP_POINTS[pos] : 0; }  // pos=0 -> 25 ... pos=14 -> 1
-var CLASIF_CACHE=null;
 /* Nunca dejar una lectura de Firestore colgada para siempre (reportado:
    "se queda en Calculando... y no avanza" -- si initializeFirestore con
    persistencia local se atasca esperando un candado de otra pestaña/
@@ -500,13 +499,16 @@ async function computeClasificacion(){
   list.sort(function(a,b){ return b.points-a.points; });
   return list;
 }
+/* Se recalcula siempre desde cero (pedido expreso, 2026-09-28: "que se
+   actualice al entrar en la pestaña") -- sin cache. Igual que Rankings y
+   la tabla de cada Campeonato, que ya eran siempre al momento; antes
+   Clasificacion era la unica que se quedaba con lo primero que habia
+   calculado en la sesion hasta pulsar "Actualizar" a mano. */
 async function renderClasificacion(){
   var host=$('clasifBody');
-  if(CLASIF_CACHE){ paintClasificacion(CLASIF_CACHE); return; }
   host.innerHTML='<div class="hint">Calculando…</div>';
   try{
     var list=await computeClasificacion();
-    CLASIF_CACHE=list;
     paintClasificacion(list);
   }catch(e){
     host.innerHTML='<div class="hint">No se pudo calcular la clasificación. Comprueba la conexión.</div>';
@@ -527,7 +529,7 @@ function paintClasificacion(list){
   });
   html+='</div><button class="add-prueba" id="btnRefreshClasif" style="margin-top:14px;">Actualizar</button>';
   host.innerHTML=html;
-  $('btnRefreshClasif').addEventListener('click', function(){ CLASIF_CACHE=null; renderClasificacion(); });
+  $('btnRefreshClasif').addEventListener('click', renderClasificacion);
 }
 
 /* ---------- Admin ----------
