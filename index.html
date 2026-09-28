@@ -152,6 +152,9 @@ if('serviceWorker' in navigator){
   .prueba-row select, .prueba-row input{flex:1;min-width:0;padding:7px 6px;border:2px solid var(--borde);border-radius:6px;font-size:12px;font-family:inherit;}
   .prueba-row select.tipo{flex:0 0 88px;}
   .prueba-row .rm-row{flex:none;width:30px;height:30px;border-radius:50%;border:0;background:#eee;color:#900;font-weight:900;cursor:pointer;}
+  .prueba-dims{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px 2px;}
+  .prueba-dims select{flex:1 1 74px;min-width:70px;padding:6px;border:2px solid var(--borde);border-radius:6px;font-size:10.5px;font-family:inherit;background:#fafafa;}
+  .prueba-dims select:disabled{opacity:.4;}
   .add-prueba{margin-top:4px;background:#fff;border:2px dashed var(--borde);border-radius:6px;padding:8px;width:100%;font-size:11.5px;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;color:#555;cursor:pointer;}
   .champ-form-actions{display:flex;gap:8px;margin-top:14px;}
   .champ-form-actions button{flex:1;padding:11px;border:0;border-radius:6px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;font-size:12px;cursor:pointer;}
@@ -219,7 +222,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v8</div>
+    <div class="app-ver">v9</div>
   </footer>
 
 </div>
@@ -378,7 +381,52 @@ var APP_ADAPTERS=[
     metric:'avg', better:'lower', unidad:'ms', inClasif:false },
   { slug:'rds-reaction-test', name:'Velocidad de Reacción',
     collection:'scores_reaction_10_normal_press_sound', match:null,
-    metric:'avg', better:'lower', unidad:'ms', inClasif:true },
+    metric:'avg', better:'lower', unidad:'ms', inClasif:true,
+    /* Unica app con "dims": permite elegir un combo DISTINTO al oficial en
+       Campeonatos (pedido expreso, 2026-09-28 -- "Go/NoGo, 15, subir").
+       Limite NO esta en las opciones a proposito: guarda "completed" en
+       vez de "avg" (mismo patron que Ball Coordination Limite), y no se ha
+       verificado ese caso -- mejor no ofrecerlo que ofrecer una tabla mal.
+       buildCollection() replica las mismas reglas que la propia app aplica
+       en su pantalla de inicio (ver setMode()/setPulseMode() en
+       rds-reaction-test/index.html): Distractor y Go/NoGo fuerzan sin
+       sonido; Distractor no admite las variantes "Bajar 2" ni "Subir 2". */
+    dims:[
+      { key:'mode', label:'Modo', def:'normal', options:[
+          {value:'normal',label:'Normal'}, {value:'gonogo',label:'Go/NoGo'}, {value:'distractor',label:'Distractor'} ] },
+      { key:'rounds', label:'Rondas', def:'10', options:[
+          {value:'10',label:'10'},{value:'15',label:'15'},{value:'30',label:'30'},{value:'50',label:'50'} ] },
+      { key:'pulse', label:'Pulso', def:'press', options:[
+          {value:'press',label:'Bajar'},{value:'press2',label:'Bajar 2'},{value:'press2i',label:'Bajar 2*'},
+          {value:'release',label:'Subir'},{value:'release2',label:'Subir 2'},{value:'release2i',label:'Subir 2*'} ] },
+      { key:'sound', label:'Sonido', def:'sound', options:[
+          {value:'sound',label:'Con sonido'},{value:'nosound',label:'Sin sonido'} ] }
+    ],
+    dimLabel:function(v){
+      var mode=v.mode||'normal', rounds=v.rounds||'10';
+      var pulseLbl={press:'Bajar',press2:'Bajar 2',press2i:'Bajar 2*',release:'Subir',release2:'Subir 2',release2i:'Subir 2*'}[v.pulse||'press'];
+      var modeLbl={normal:'Normal',gonogo:'Go/NoGo',distractor:'Distractor'}[mode];
+      var soundLbl=(mode==='distractor'||mode==='gonogo') ? 'sin sonido' : ((v.sound||'sound')==='sound'?'con sonido':'sin sonido');
+      return modeLbl+', '+rounds+', '+pulseLbl+', '+soundLbl;
+    },
+    buildCollection:function(v){
+      var mode=v.mode||'normal', rounds=v.rounds||'10', pulse=v.pulse||'press';
+      if(mode==='distractor' && (pulse==='press2'||pulse==='press2i'||pulse==='release2'||pulse==='release2i')) pulse='press';
+      var sound=(mode==='distractor'||mode==='gonogo') ? 'nosound' : (v.sound||'sound');
+      return 'scores_reaction_'+rounds+'_'+mode+'_'+pulse+'_'+sound;
+    },
+    /* Mismas reglas que la propia app en su pantalla de inicio (ver
+       setMode()/setPulseMode()): corrige el valor si deja de ser valido
+       al cambiar otro campo, y deshabilita en el formulario lo que la app
+       tambien deshabilitaria. */
+    constrain:function(v){
+      if(v.mode==='distractor' && (v.pulse==='press2'||v.pulse==='press2i'||v.pulse==='release2'||v.pulse==='release2i')) v.pulse='press';
+      if(v.mode==='distractor'||v.mode==='gonogo') v.sound='nosound';
+    },
+    disabledDim:function(v, key){ return key==='sound' && (v.mode==='distractor'||v.mode==='gonogo'); },
+    disabledOption:function(v, key, val){
+      return key==='pulse' && v.mode==='distractor' && (val==='press2'||val==='press2i'||val==='release2'||val==='release2i');
+    } },
   { slug:'rds-circuit-test', name:'Circuit Reaction',
     collection:'scores_circuit', match:{s1:'nor', s2:'lem', s3:'3'},
     metric:'avg', better:'lower', unidad:'s', inClasif:true },
@@ -541,7 +589,11 @@ function renderChampList(){
   host.innerHTML='';
   CHAMPS.forEach(function(c){
     var card=document.createElement('div'); card.className='champ-card';
-    var pruebasTxt=(c.entries||[]).map(function(e){ return appNameOf(e.app)+' ('+tipoLabel(e.tipo)+')'; }).join('<br>');
+    var pruebasTxt=(c.entries||[]).map(function(e){
+      var adapter=adapterOf(e.app);
+      var nm=(adapter && adapter.dims && e.dimValues) ? (adapter.name+' &middot; '+esc(adapter.dimLabel(e.dimValues))) : appNameOf(e.app);
+      return nm+' ('+tipoLabel(e.tipo)+')';
+    }).join('<br>');
     card.innerHTML='<h3>'+esc(c.title)+'</h3>'
       +'<div class="pruebas">'+pruebasTxt+'</div>'
       +'<button class="champ-open" data-id="'+c.id+'">Ver tabla</button>'
@@ -573,18 +625,31 @@ function fmtVal(val, adapter){
   if(adapter.unidad==='pts') return val.toFixed(1)+' pts';
   return String(val);
 }
+/* Resuelve la coleccion/filtro reales de una prueba: si la app tiene
+   "dims" (de momento solo Velocidad de Reaccion) y la prueba trae
+   dimValues, se construye la coleccion a medida (buildCollection); si no,
+   se usa el combo oficial de siempre (adapter.collection/match). */
+function resolveEntryQuery(adapter, entry){
+  if(adapter.dims && entry.dimValues){
+    return { collection:adapter.buildCollection(entry.dimValues), match:null,
+              label:adapter.name+' ('+adapter.dimLabel(entry.dimValues)+')' };
+  }
+  return { collection:adapter.collection, match:adapter.match, label:adapter.name };
+}
 async function computeChampTable(entries){
-  var valid=entries.map(function(entry){ return { entry:entry, adapter:adapterOf(entry.app) }; })
-                    .filter(function(x){ return x.adapter; });   // prueba de una app sin adaptador (p.ej. quitada despues) -- se omite
+  var valid=entries.map(function(entry){
+    var adapter=adapterOf(entry.app); if(!adapter) return null;
+    return { entry:entry, adapter:adapter, q:resolveEntryQuery(adapter, entry) };
+  }).filter(function(x){ return x; });   // prueba de una app sin adaptador (p.ej. quitada despues) -- se omite
   /* En paralelo, con limite de tiempo por prueba -- ver FETCH_TIMEOUT_MS,
      mismo motivo que en Clasificacion ("se queda en Calculando..."). */
   var results=await Promise.all(valid.map(function(x){
-    return withTimeout(window.hubFetchRanking(x.adapter.collection, x.adapter.match), FETCH_TIMEOUT_MS);
+    return withTimeout(window.hubFetchRanking(x.q.collection, x.q.match), FETCH_TIMEOUT_MS);
   }));
   var columns=[], rows={};
   valid.forEach(function(x, i){
     var adapter=x.adapter, docs=results[i];
-    var col={ label:adapter.name, tipo:x.entry.tipo, unidad:adapter.unidad, adapter:adapter };
+    var col={ label:x.q.label, tipo:x.entry.tipo, unidad:adapter.unidad, adapter:adapter };
     columns.push(col);
     if(docs==null) return;   // fallo o timeout en esa prueba -- columna vacia, no rompe las demas
     var ranked=dedupeBest(docs, adapter.metric, adapter.better);
@@ -666,7 +731,11 @@ function openChampForm(editId){
   if(!isAdmin()) return;
   FORM_EDIT_ID = editId || null;
   var existing = editId ? CHAMPS.filter(function(x){ return x.id===editId; })[0] : null;
-  FORM_ENTRIES = existing ? (existing.entries||[]).map(function(e){ return Object.assign({}, e); }) : [];
+  FORM_ENTRIES = existing ? (existing.entries||[]).map(function(e){
+    var copy=Object.assign({}, e);
+    if(copy.dimValues) copy.dimValues=Object.assign({}, copy.dimValues);   // copia aparte, no tocar el original hasta Guardar
+    return copy;
+  }) : [];
   var box=$('champForm');
   box.innerHTML='<div class="champ-form">'
     +'<label>T&#237;tulo</label>'
@@ -682,21 +751,60 @@ function openChampForm(editId){
   $('btnCancelChamp').addEventListener('click', closeChampForm);
   box.scrollIntoView({behavior:'smooth', block:'start'});
 }
+/* Valores de dims por defecto = el combo oficial de la app (mismo que
+   Clasificacion), para que "no tocar nada" siga dando el mismo resultado
+   de siempre. */
+function defaultDimValues(adapter){
+  var v={};
+  (adapter.dims||[]).forEach(function(d){ v[d.key]=d.def; });
+  return v;
+}
 function renderPruebaRows(){
   var host=$('pruebaRows'); if(!host) return;
   host.innerHTML='';
   FORM_ENTRIES.forEach(function(entry, idx){
+    var wrap=document.createElement('div');
     var row=document.createElement('div'); row.className='prueba-row';
     var appSel=document.createElement('select');
     APP_ADAPTERS.forEach(function(a){ var o=document.createElement('option'); o.value=a.slug; o.textContent=a.name.replace(/&#\d+;/g,''); if(a.slug===entry.app) o.selected=true; appSel.appendChild(o); });
-    appSel.addEventListener('change', function(){ entry.app=appSel.value; });
+    appSel.addEventListener('change', function(){
+      entry.app=appSel.value;
+      var adapter=adapterOf(entry.app);
+      entry.dimValues = (adapter && adapter.dims) ? defaultDimValues(adapter) : undefined;
+      renderPruebaRows();
+    });
     var tipoSel=document.createElement('select'); tipoSel.className='tipo';
     ['pos','avg'].forEach(function(t){ var o=document.createElement('option'); o.value=t; o.textContent=(t==='pos'?'Posición':'Valor'); if(t===entry.tipo) o.selected=true; tipoSel.appendChild(o); });
     tipoSel.addEventListener('change', function(){ entry.tipo=tipoSel.value; });
     var rm=document.createElement('button'); rm.type='button'; rm.className='rm-row'; rm.textContent='×';
     rm.addEventListener('click', function(){ FORM_ENTRIES.splice(idx,1); renderPruebaRows(); });
     row.appendChild(appSel); row.appendChild(tipoSel); row.appendChild(rm);
-    host.appendChild(row);
+    wrap.appendChild(row);
+
+    var adapter=adapterOf(entry.app);
+    if(adapter && adapter.dims){
+      if(!entry.dimValues) entry.dimValues=defaultDimValues(adapter);
+      if(adapter.constrain) adapter.constrain(entry.dimValues);
+      var dimsRow=document.createElement('div'); dimsRow.className='prueba-dims';
+      adapter.dims.forEach(function(d){
+        var sel=document.createElement('select');
+        sel.disabled = !!(adapter.disabledDim && adapter.disabledDim(entry.dimValues, d.key));
+        d.options.forEach(function(o){
+          var opt=document.createElement('option'); opt.value=o.value; opt.textContent=o.label;
+          if(adapter.disabledOption && adapter.disabledOption(entry.dimValues, d.key, o.value)) opt.disabled=true;
+          if(o.value===entry.dimValues[d.key]) opt.selected=true;
+          sel.appendChild(opt);
+        });
+        sel.addEventListener('change', function(){
+          entry.dimValues[d.key]=sel.value;
+          if(adapter.constrain) adapter.constrain(entry.dimValues);
+          renderPruebaRows();
+        });
+        dimsRow.appendChild(sel);
+      });
+      wrap.appendChild(dimsRow);
+    }
+    host.appendChild(wrap);
   });
 }
 async function saveChampForm(){
