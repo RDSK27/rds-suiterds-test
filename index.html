@@ -219,7 +219,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v7</div>
+    <div class="app-ver">v8</div>
   </footer>
 
 </div>
@@ -227,7 +227,7 @@ if('serviceWorker' in navigator){
 <!-- Firebase (mismo proyecto compartido que el resto de la suite) -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
-import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, where } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, where } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 const firebaseConfig = {
   apiKey: "AIzaSyBbEgbWddPt_rhPM24bL_Nacp7TAlh1biM",
   authDomain: "rds-reaction-test.firebaseapp.com",
@@ -236,11 +236,18 @@ const firebaseConfig = {
   messagingSenderId: "490684952529",
   appId: "1:490684952529:web:bb53a9813bd58ecdb3baf0"
 };
+/* SuiteRDS lee/escribe siempre en linea (rankings de otras apps, admin de
+   campeonatos) -- a diferencia de las 12 apps de ejercicio, no necesita
+   persistencia offline. Se usa getFirestore() a secas, sin
+   initializeFirestore+persistentLocalCache+persistentMultipleTabManager:
+   ese modo de persistencia puede quedarse esperando un candado entre
+   pestanas/sesiones del mismo origen sin liberarse nunca (reportado
+   2026-09-28: "Clasificacion se queda en Calculando... y no avanza"). Ver
+   tambien FETCH_TIMEOUT_MS mas abajo, como red de seguridad aparte. */
 let db=null;
 try{
   const app=initializeApp(firebaseConfig);
-  try{ db=initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }); }
-  catch(e){ db=getFirestore(app); }
+  db=getFirestore(app);
 }catch(e){ db=null; }
 window.hubReady=!!db;
 window.hubAddChamp=async function(rec){
@@ -408,13 +415,31 @@ function dedupeBest(docs, metric, better){
 var MOTOGP_POINTS=[25,20,16,13,11,10,9,8,7,6,5,4,3,2,1];
 function pointsFor(pos){ return pos<MOTOGP_POINTS.length ? MOTOGP_POINTS[pos] : 0; }  // pos=0 -> 25 ... pos=14 -> 1
 var CLASIF_CACHE=null;
+/* Nunca dejar una lectura de Firestore colgada para siempre (reportado:
+   "se queda en Calculando... y no avanza" -- si initializeFirestore con
+   persistencia local se atasca esperando un candado de otra pestaña/
+   sesion, la promesa de getDocs puede no resolver NUNCA). Pasados
+   FETCH_TIMEOUT_MS se da esa lectura por fallida (null) y se sigue con
+   las demas, igual que si hubiera fallado de verdad. */
+var FETCH_TIMEOUT_MS=8000;
+function withTimeout(promise, ms){
+  return Promise.race([
+    promise,
+    new Promise(function(resolve){ setTimeout(function(){ resolve(null); }, ms); })
+  ]);
+}
 async function computeClasificacion(){
   var totals={};
   var lista=APP_ADAPTERS.filter(function(a){ return a.inClasif; });
-  for(var i=0;i<lista.length;i++){
-    var cfg=lista[i];
-    var docs = await window.hubFetchRanking(cfg.collection, cfg.match);
-    if(!docs) continue;   // fallo de lectura en esa app -- se omite, no rompe el resto
+  /* En paralelo (no una app detras de otra): si alguna tarda o se atasca,
+     no alarga la espera de las demas, y el limite total es ~FETCH_TIMEOUT_MS
+     en vez de sumarse por cada app. */
+  var results=await Promise.all(lista.map(function(cfg){
+    return withTimeout(window.hubFetchRanking(cfg.collection, cfg.match), FETCH_TIMEOUT_MS);
+  }));
+  lista.forEach(function(cfg, i){
+    var docs=results[i];
+    if(!docs) return;   // fallo o timeout en esa app -- se omite, no rompe el resto
     var ranked=dedupeBest(docs, cfg.metric, cfg.better);
     ranked.slice(0,MOTOGP_POINTS.length).forEach(function(r, idx){
       var pts=pointsFor(idx);
@@ -422,7 +447,7 @@ async function computeClasificacion(){
       totals[r.name].points += pts;
       totals[r.name].apps.push({ app:cfg.name, pos:idx+1, pts:pts });
     });
-  }
+  });
   var list=Object.keys(totals).map(function(k){ return totals[k]; });
   list.sort(function(a,b){ return b.points-a.points; });
   return list;
@@ -549,14 +574,19 @@ function fmtVal(val, adapter){
   return String(val);
 }
 async function computeChampTable(entries){
+  var valid=entries.map(function(entry){ return { entry:entry, adapter:adapterOf(entry.app) }; })
+                    .filter(function(x){ return x.adapter; });   // prueba de una app sin adaptador (p.ej. quitada despues) -- se omite
+  /* En paralelo, con limite de tiempo por prueba -- ver FETCH_TIMEOUT_MS,
+     mismo motivo que en Clasificacion ("se queda en Calculando..."). */
+  var results=await Promise.all(valid.map(function(x){
+    return withTimeout(window.hubFetchRanking(x.adapter.collection, x.adapter.match), FETCH_TIMEOUT_MS);
+  }));
   var columns=[], rows={};
-  for(var i=0;i<entries.length;i++){
-    var entry=entries[i], adapter=adapterOf(entry.app);
-    if(!adapter) continue;   // prueba guardada de una app sin adaptador (p.ej. quitada despues) -- se omite
-    var docs=await window.hubFetchRanking(adapter.collection, adapter.match);
-    var col={ label:adapter.name, tipo:entry.tipo, unidad:adapter.unidad, adapter:adapter };
+  valid.forEach(function(x, i){
+    var adapter=x.adapter, docs=results[i];
+    var col={ label:adapter.name, tipo:x.entry.tipo, unidad:adapter.unidad, adapter:adapter };
     columns.push(col);
-    if(docs==null) continue;   // fallo de lectura de esa prueba -- columna vacia, no rompe las demas
+    if(docs==null) return;   // fallo o timeout en esa prueba -- columna vacia, no rompe las demas
     var ranked=dedupeBest(docs, adapter.metric, adapter.better);
     ranked.forEach(function(r, idx){
       if(!rows[r.name]) rows[r.name]={ name:r.name, cells:{}, points:0 };
@@ -564,7 +594,7 @@ async function computeChampTable(entries){
       rows[r.name].cells[col.label+'#'+columns.length]={ pos:idx+1, val:r.val, pts:pts };
       rows[r.name].points+=pts;
     });
-  }
+  });
   var list=Object.keys(rows).map(function(k){ return rows[k]; });
   list.sort(function(a,b){ return b.points-a.points; });
   return { columns:columns, rows:list };
