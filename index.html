@@ -128,6 +128,20 @@ if('serviceWorker' in navigator){
   .clasif-name{font-weight:800;font-size:13px;letter-spacing:0.02em;color:var(--negro);}
   .clasif-detalle{font-size:10px;color:#999;line-height:1.4;margin-top:2px;}
   .clasif-pts{flex:none;font-weight:900;font-size:17px;color:var(--rojo);min-width:26px;text-align:right;}
+
+  /* ---------- Tabla de campeonato ---------- */
+  .champ-table-back{background:none;border:0;color:var(--rojo);font-weight:800;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;padding:6px 0 12px;}
+  .champ-table-title{font-weight:900;font-size:17px;text-transform:uppercase;letter-spacing:0.02em;margin-bottom:10px;}
+  .champ-table-scroll{overflow-x:auto;border:2px solid var(--borde);border-radius:8px;-webkit-overflow-scrolling:touch;}
+  table.champ-table{border-collapse:collapse;font-size:11.5px;white-space:nowrap;}
+  table.champ-table th, table.champ-table td{padding:7px 9px;border-bottom:1px solid #eee;text-align:center;}
+  table.champ-table th{background:#111;color:#fff;font-weight:800;text-transform:uppercase;font-size:9.5px;letter-spacing:0.03em;white-space:normal;max-width:90px;}
+  table.champ-table td.champ-name-cell, table.champ-table th.champ-name-th{position:sticky;left:0;background:#fff;text-align:left;font-weight:800;z-index:1;box-shadow:2px 0 4px rgba(0,0,0,.06);}
+  table.champ-table th.champ-name-th{background:#111;color:#fff;z-index:2;}
+  table.champ-table td.champ-pts-cell{font-weight:900;color:var(--rojo);}
+  table.champ-table tr:nth-child(odd) td{background:#fafafa;}
+  table.champ-table tr:nth-child(odd) td.champ-name-cell{background:#fafafa;}
+  table.champ-table td.champ-empty{color:#ccc;}
   .btn-new-champ{width:100%;background:#111;color:#fff;border:0;border-top:4px solid #b03020;border-radius:8px;padding:12px;font-weight:900;letter-spacing:0.08em;text-transform:uppercase;font-size:12.5px;cursor:pointer;margin-bottom:14px;}
 
   /* ---------- Formulario campeonato ---------- */
@@ -196,13 +210,14 @@ if('serviceWorker' in navigator){
       <div id="champForm"></div>
       <button class="btn-new-champ" id="btnNewChamp" style="display:none;">+ Nuevo campeonato</button>
       <div id="champList"></div>
+      <div id="champTableView" style="display:none;"></div>
     </section>
 
   </main>
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v5</div>
+    <div class="app-ver">v6</div>
   </footer>
 
 </div>
@@ -324,32 +339,51 @@ renderAppGrid();
    coleccion POR combinacion (scores_reaction_<rondas>_<modo>_<pulso>_
    <sonido>) en vez de filtrar con where() sobre una unica coleccion como
    el resto -- no hace falta filtro, la coleccion ya es justo ese combo. */
-var OFFICIAL_RANKINGS=[
+/* Adaptador de cada app: como leer SU ranking real desde SuiteRDS. De
+   momento cada app aporta un UNICO combo (el marcado por defecto en su
+   pantalla de inicio) -- elegir OTRO modo de una app es una mejora
+   futura (haria falta un catalogo de modos por app, no solo el de
+   partida). inClasif=false la deja fuera de la Clasificacion general
+   (pedido expreso) pero sigue disponible para Campeonatos.
+   Karate y Tenis se han quedado FUERA de este catalogo (no en Rankings,
+   que sigue mostrando las 12): sus pantallas de inicio no tienen un combo
+   por defecto simple y fiable (Karate: la 3a fila Combate/Campeonato no
+   tiene seleccion por defecto; Tenis: selectores propios sin patron
+   .segment) -- no se ha querido adivinar mal. Se pueden anadir el dia que
+   haga falta de verdad, investigando cada una a fondo. */
+var APP_ADAPTERS=[
   { slug:'rds-ballcoordination-test', name:'Ball Coordination',
     collection:'scores_ballcoordination', match:{mode:'normal', count:15, penaliza:true},
-    metric:'avgRT', better:'lower' },
+    metric:'avgRT', better:'lower', unidad:'ms', inClasif:true },
   { slug:'rds-lightsreaction-test', name:'Lights Speed',
     collection:'scores_lights', match:{mode:'normal', stim:'cambia', total:15},
-    metric:'avg', better:'lower' },
+    metric:'avg', better:'lower', unidad:'ms', inClasif:true },
   { slug:'rds-perception-test', name:'Perception',
     collection:'scores_perception', match:{mode:'normal', stim:'fijo', total:5},
-    metric:'avg', better:'lower' },
+    metric:'avg', better:'lower', unidad:'ms', inClasif:true },
   { slug:'rds-processing-test', name:'Processing',
     collection:'scores_processing', match:{mode:'normal', stim:'cambia', total:15},
-    metric:'avg', better:'lower' },
+    metric:'avg', better:'lower', unidad:'ms', inClasif:true },
+  { slug:'rds-rallymemory-test', name:'Rally Memory',
+    collection:'scores_rallymemory', match:{mode:'normal', stim:'normal', total:5},
+    metric:'avg', better:'lower', unidad:'ms', inClasif:false },
   { slug:'rds-reaction-test', name:'Velocidad de Reacción',
     collection:'scores_reaction_10_normal_press_sound', match:null,
-    metric:'avg', better:'lower' },
+    metric:'avg', better:'lower', unidad:'ms', inClasif:true },
   { slug:'rds-circuit-test', name:'Circuit Reaction',
     collection:'scores_circuit', match:{s1:'nor', s2:'lem', s3:'3'},
-    metric:'avg', better:'lower' },
+    metric:'avg', better:'lower', unidad:'s', inClasif:true },
+  { slug:'rds-gimnasia-test', name:'Gimnasia',
+    collection:'scores_gimnasia', match:null,
+    metric:'avg', better:'higher', unidad:'pts', inClasif:false },
   { slug:'rds-memorycards-test', name:'Memory Cards',
     collection:'scores_memorycards', match:{modo:'normal'},
-    metric:'cards', better:'higher' },
+    metric:'cards', better:'higher', unidad:'cartas', inClasif:true },
   { slug:'rds-reactiontrial-test', name:'Reaction Trial',
     collection:'scores_reactiontrial', match:{s1:'normal', s2:'15', s3:'nonstop'},
-    metric:'avg', better:'lower' }
+    metric:'avg', better:'lower', unidad:'ms', inClasif:true }
 ];
+function adapterOf(slug){ return APP_ADAPTERS.filter(function(a){ return a.slug===slug; })[0]||null; }
 /* Mejor marca de cada persona (por nombre exacto, tal como lo escribio
    -- INI o INI-DEPORTE) dentro de un ranking, sin repetidos. */
 function dedupeBest(docs, metric, better){
@@ -374,8 +408,9 @@ function pointsFor(pos){ return pos<MOTOGP_POINTS.length ? MOTOGP_POINTS[pos] : 
 var CLASIF_CACHE=null;
 async function computeClasificacion(){
   var totals={};
-  for(var i=0;i<OFFICIAL_RANKINGS.length;i++){
-    var cfg=OFFICIAL_RANKINGS[i];
+  var lista=APP_ADAPTERS.filter(function(a){ return a.inClasif; });
+  for(var i=0;i<lista.length;i++){
+    var cfg=lista[i];
     var docs = await window.hubFetchRanking(cfg.collection, cfg.match);
     if(!docs) continue;   // fallo de lectura en esa app -- se omite, no rompe el resto
     var ranked=dedupeBest(docs, cfg.metric, cfg.better);
@@ -475,7 +510,7 @@ function renderChampList(){
   host.innerHTML='';
   CHAMPS.forEach(function(c){
     var card=document.createElement('div'); card.className='champ-card';
-    var pruebasTxt=(c.entries||[]).map(function(e){ return appNameOf(e.app)+' &middot; '+esc(e.modo)+' ('+tipoLabel(e.tipo)+')'; }).join('<br>');
+    var pruebasTxt=(c.entries||[]).map(function(e){ return appNameOf(e.app)+' ('+tipoLabel(e.tipo)+')'; }).join('<br>');
     card.innerHTML='<h3>'+esc(c.title)+'</h3>'
       +'<div class="pruebas">'+pruebasTxt+'</div>'
       +'<button class="champ-open" data-id="'+c.id+'">Ver tabla</button>'
@@ -492,12 +527,100 @@ async function loadChamps(){
   renderChampList();
 }
 
-/* Tabla en vivo por campeonato: pendiente (fase siguiente) -- necesita un
-   adaptador por app que sepa leer su coleccion/estructura de modos real.
-   De momento solo confirma que el campeonato existe y que prueba tiene. */
-function openChampTable(id){
+/* ---------- Campeonatos: tabla en vivo ----------
+   Se lee el ranking real de cada prueba (mismo adaptador que Clasificacion,
+   ver APP_ADAPTERS) y se cruza: filas = todas las personas que aparecen en
+   AL MENOS una prueba, columnas = las pruebas elegidas. La celda ensena
+   posicion o valor bruto segun lo que eligio el admin (tipo), pero los
+   PUNTOS de la columna "Total" siempre se calculan por posicion dentro de
+   esa prueba (escala MotoGP, igual que Clasificacion) -- asi se puede
+   comparar aunque se mezclen columnas de posicion y de valor. */
+function fmtVal(val, adapter){
+  if(adapter.unidad==='ms') return Math.round(val)+' ms';
+  if(adapter.unidad==='s') return val.toFixed(2)+' s';
+  if(adapter.unidad==='cartas') return val+' cartas';
+  if(adapter.unidad==='pts') return val.toFixed(1)+' pts';
+  return String(val);
+}
+async function computeChampTable(entries){
+  var columns=[], rows={};
+  for(var i=0;i<entries.length;i++){
+    var entry=entries[i], adapter=adapterOf(entry.app);
+    if(!adapter) continue;   // prueba guardada de una app sin adaptador (p.ej. quitada despues) -- se omite
+    var docs=await window.hubFetchRanking(adapter.collection, adapter.match);
+    var col={ label:adapter.name, tipo:entry.tipo, unidad:adapter.unidad, adapter:adapter };
+    columns.push(col);
+    if(docs==null) continue;   // fallo de lectura de esa prueba -- columna vacia, no rompe las demas
+    var ranked=dedupeBest(docs, adapter.metric, adapter.better);
+    ranked.forEach(function(r, idx){
+      if(!rows[r.name]) rows[r.name]={ name:r.name, cells:{}, points:0 };
+      var pts=pointsFor(idx);
+      rows[r.name].cells[col.label+'#'+columns.length]={ pos:idx+1, val:r.val, pts:pts };
+      rows[r.name].points+=pts;
+    });
+  }
+  var list=Object.keys(rows).map(function(k){ return rows[k]; });
+  list.sort(function(a,b){ return b.points-a.points; });
+  return { columns:columns, rows:list };
+}
+async function openChampTable(id){
   var c=CHAMPS.filter(function(x){ return x.id===id; })[0]; if(!c) return;
-  alert('Tabla de "'+c.title+'": en construcción. Próximamente comparará aquí los resultados reales de cada prueba.');
+  $('champList').style.display='none';
+  $('btnNewChamp').style.display='none';
+  var view=$('champTableView');
+  view.style.display='';
+  view.innerHTML='<button class="champ-table-back" id="btnBackChamp">&larr; Volver a Campeonatos</button>'
+    +'<div class="champ-table-title">'+esc(c.title)+'</div>'
+    +'<div class="hint" style="padding:6px 0 14px;">Calculando&hellip;</div>';
+  $('btnBackChamp').addEventListener('click', closeChampTable);
+  try{
+    var data=await computeChampTable(c.entries||[]);
+    paintChampTable(c, data);
+  }catch(e){
+    view.querySelector('.hint').textContent='No se pudo calcular la tabla. Comprueba la conexión.';
+  }
+}
+function closeChampTable(){
+  $('champTableView').style.display='none';
+  $('champTableView').innerHTML='';
+  $('champList').style.display='';
+  $('btnNewChamp').style.display=isAdmin()?'':'none';
+}
+function paintChampTable(c, data){
+  var view=$('champTableView');
+  if(!data.columns.length){
+    view.innerHTML='<button class="champ-table-back" id="btnBackChamp">&larr; Volver a Campeonatos</button>'
+      +'<div class="champ-table-title">'+esc(c.title)+'</div>'
+      +'<div class="hint">Este campeonato no tiene pruebas validas todavía.</div>';
+    $('btnBackChamp').addEventListener('click', closeChampTable);
+    return;
+  }
+  if(!data.rows.length){
+    view.innerHTML='<button class="champ-table-back" id="btnBackChamp">&larr; Volver a Campeonatos</button>'
+      +'<div class="champ-table-title">'+esc(c.title)+'</div>'
+      +'<div class="hint">Todavía no hay marcas guardadas en ninguna de estas pruebas.</div>';
+    $('btnBackChamp').addEventListener('click', closeChampTable);
+    return;
+  }
+  var thead='<tr><th class="champ-name-th">Jugador</th>';
+  data.columns.forEach(function(col){ thead+='<th>'+esc(col.label)+'<br>('+tipoLabel(col.tipo)+')</th>'; });
+  thead+='<th>Total</th></tr>';
+  var tbody='';
+  data.rows.forEach(function(row){
+    tbody+='<tr><td class="champ-name-cell">'+esc(row.name)+'</td>';
+    data.columns.forEach(function(col, ci){
+      var cell=row.cells[col.label+'#'+(ci+1)];
+      if(!cell){ tbody+='<td class="champ-empty">&mdash;</td>'; return; }
+      var shown = col.tipo==='avg' ? fmtVal(cell.val, col.adapter) : (cell.pos+'&#186;');
+      tbody+='<td>'+shown+'</td>';
+    });
+    tbody+='<td class="champ-pts-cell">'+row.points+'</td></tr>';
+  });
+  view.innerHTML='<button class="champ-table-back" id="btnBackChamp">&larr; Volver a Campeonatos</button>'
+    +'<div class="champ-table-title">'+esc(c.title)+'</div>'
+    +'<div class="hint" style="padding:0 0 10px;text-align:left;">"Total" son puntos MotoGP seg&uacute;n el puesto en cada prueba (aunque la columna ense&ntilde;e el valor bruto).</div>'
+    +'<div class="champ-table-scroll"><table class="champ-table"><thead>'+thead+'</thead><tbody>'+tbody+'</tbody></table></div>';
+  $('btnBackChamp').addEventListener('click', closeChampTable);
 }
 
 /* ---------- Campeonatos: crear / editar ---------- */
@@ -518,7 +641,7 @@ function openChampForm(editId){
     +'<div class="champ-form-actions"><button class="save" id="btnSaveChamp">Guardar</button><button class="cancel" id="btnCancelChamp">Cancelar</button></div>'
     +'</div>';
   renderPruebaRows();
-  $('btnAddPrueba').addEventListener('click', function(){ FORM_ENTRIES.push({app:APPS[0].slug, modo:'', tipo:'pos'}); renderPruebaRows(); });
+  $('btnAddPrueba').addEventListener('click', function(){ FORM_ENTRIES.push({app:APP_ADAPTERS[0].slug, tipo:'pos'}); renderPruebaRows(); });
   $('btnSaveChamp').addEventListener('click', saveChampForm);
   $('btnCancelChamp').addEventListener('click', closeChampForm);
   box.scrollIntoView({behavior:'smooth', block:'start'});
@@ -529,16 +652,14 @@ function renderPruebaRows(){
   FORM_ENTRIES.forEach(function(entry, idx){
     var row=document.createElement('div'); row.className='prueba-row';
     var appSel=document.createElement('select');
-    APPS.forEach(function(a){ var o=document.createElement('option'); o.value=a.slug; o.textContent=a.name.replace(/&#\d+;/g,''); if(a.slug===entry.app) o.selected=true; appSel.appendChild(o); });
+    APP_ADAPTERS.forEach(function(a){ var o=document.createElement('option'); o.value=a.slug; o.textContent=a.name.replace(/&#\d+;/g,''); if(a.slug===entry.app) o.selected=true; appSel.appendChild(o); });
     appSel.addEventListener('change', function(){ entry.app=appSel.value; });
-    var modoInput=document.createElement('input'); modoInput.type='text'; modoInput.placeholder='Modo (p. ej. Extremo 10)'; modoInput.value=entry.modo||'';
-    modoInput.addEventListener('input', function(){ entry.modo=modoInput.value; });
     var tipoSel=document.createElement('select'); tipoSel.className='tipo';
     ['pos','avg'].forEach(function(t){ var o=document.createElement('option'); o.value=t; o.textContent=(t==='pos'?'Posición':'Valor'); if(t===entry.tipo) o.selected=true; tipoSel.appendChild(o); });
     tipoSel.addEventListener('change', function(){ entry.tipo=tipoSel.value; });
     var rm=document.createElement('button'); rm.type='button'; rm.className='rm-row'; rm.textContent='×';
     rm.addEventListener('click', function(){ FORM_ENTRIES.splice(idx,1); renderPruebaRows(); });
-    row.appendChild(appSel); row.appendChild(modoInput); row.appendChild(tipoSel); row.appendChild(rm);
+    row.appendChild(appSel); row.appendChild(tipoSel); row.appendChild(rm);
     host.appendChild(row);
   });
 }
