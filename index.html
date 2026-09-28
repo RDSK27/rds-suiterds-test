@@ -101,6 +101,20 @@ if('serviceWorker' in navigator){
   .app-btn img{width:44px;height:44px;border-radius:9px;object-fit:cover;}
   .app-btn span{font-size:10.5px;font-weight:700;letter-spacing:0.02em;color:var(--negro);line-height:1.25;}
 
+  /* ---------- "Quien soy" -- me resalta en Clasificacion/Campeonatos ---------- */
+  #meBar{padding:8px 16px 0;}
+  .me-set{display:flex;align-items:center;justify-content:center;gap:8px;font-size:11px;color:#777;}
+  .me-set b{color:var(--negro);letter-spacing:0.03em;}
+  .me-set button{background:none;border:0;color:var(--rojo);font-weight:800;font-size:11px;text-transform:uppercase;cursor:pointer;padding:2px 0;}
+  .me-form{display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap;}
+  .me-form input{width:70px;flex:none;padding:7px 8px;border:2px solid var(--borde);border-radius:6px;font-size:13px;text-align:center;text-transform:uppercase;font-family:inherit;}
+  .me-form select{flex:1 1 140px;min-width:110px;padding:7px 8px;border:2px solid var(--borde);border-radius:6px;font-size:11.5px;font-family:inherit;}
+  .me-form button{flex:none;background:var(--rojo);color:#fff;border:0;border-radius:6px;padding:0 14px;height:32px;font-weight:900;letter-spacing:0.04em;text-transform:uppercase;font-size:11px;cursor:pointer;}
+  .clasif-row.is-me{border-color:var(--rojo);background:#fff5f4;}
+  .clasif-row.is-me .clasif-name{color:var(--rojo);}
+  table.champ-table tr.is-me td{background:#fff5f4 !important;}
+  table.champ-table tr.is-me td.champ-name-cell{color:var(--rojo);}
+
   /* ---------- Bloques comunes ---------- */
   .hint{color:#888;font-size:12.5px;line-height:1.5;text-align:center;padding:18px 8px;}
   .section-title{font-weight:900;letter-spacing:1px;text-transform:uppercase;font-size:13px;color:var(--rojo);margin:2px 0 10px;text-align:center;}
@@ -189,6 +203,8 @@ if('serviceWorker' in navigator){
     <button data-tab="campeonatos">Campeonatos</button>
   </div>
 
+  <div id="meBar"></div>
+
   <main>
 
     <!-- ================= RANKINGS ================= -->
@@ -222,7 +238,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v10</div>
+    <div class="app-ver">v11</div>
   </footer>
 
 </div>
@@ -341,6 +357,53 @@ function renderAppGrid(){
   });
 }
 renderAppGrid();
+
+/* ---------- "Quien soy": resalta mi fila en Clasificacion y Campeonatos ----------
+   Independiente del INI+deporte que cada una de las 12 apps guarda por su
+   cuenta (localStorage de cada origen, no se puede compartir entre ellas)
+   -- SuiteRDS es su propio origen, necesita su propio "quien soy". Se
+   guarda el mismo formato "INI-DEPORTE" que ya usan todas las apps, para
+   que coincida tal cual con el campo `name` de sus rankings. */
+var ME_LS='suiterds_me';
+var SPORT_OPTIONS=[
+  ['ATL','Atletismo'],['AUT','Automovilismo'],['BMT','Bádminton'],['BLC','Baloncesto'],
+  ['BLM','Balonmano'],['BOX','Boxeo'],['CIC','Ciclismo'],['ESC','Escalada'],['ESG','Esgrima'],
+  ['ESQ','Esquí'],['FTB','Fútbol'],['GIM','Gimnasia'],['GLF','Golf'],['HAL','Halterofilia'],
+  ['HCK','Hockey'],['JUD','Judo'],['KRT','Karate'],['MOT','Motociclismo'],['NTC','Natación'],
+  ['OTR','Otros'],['PAD','Pádel'],['PRG','Piragüismo'],['REM','Remo'],['RUG','Rugby'],
+  ['SRF','Surf'],['TKD','Taekwondo'],['TNS','Tenis'],['TRI','Triatlón'],['VOL','Voleibol']
+];
+function getMe(){ try{ return localStorage.getItem(ME_LS)||''; }catch(e){ return ''; } }
+function setMe(ini, dep){
+  var v=(ini||'').trim().toUpperCase().replace(/[^A-Z]/g,'').slice(0,3)+'-'+(dep||'OTR');
+  try{ localStorage.setItem(ME_LS, v); }catch(e){}
+  renderMeBar();
+}
+function renderMeBar(){
+  var host=$('meBar'), me=getMe();
+  if(me){
+    host.innerHTML='<div class="me-set">T&uacute; eres <b>'+esc(me)+'</b><button id="btnMeChange">Cambiar</button></div>';
+    $('btnMeChange').addEventListener('click', renderMeForm);
+  } else {
+    renderMeForm();
+  }
+}
+function renderMeForm(){
+  var host=$('meBar');
+  var opts=SPORT_OPTIONS.map(function(o){ return '<option value="'+o[0]+'">'+o[1]+'</option>'; }).join('');
+  host.innerHTML='<div class="me-form">'
+    +'<input type="text" id="meIniInput" placeholder="INI" maxlength="3" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false">'
+    +'<select id="meDepSelect">'+opts+'</select>'
+    +'<button id="btnMeSave">Marcarme</button>'
+    +'</div>';
+  $('meIniInput').addEventListener('input', function(){ this.value=this.value.replace(/[^A-Za-z]/g,'').toUpperCase(); });
+  $('btnMeSave').addEventListener('click', function(){
+    var ini=$('meIniInput').value;
+    if(!ini.trim()){ $('meIniInput').style.borderColor='#b03020'; return; }
+    setMe(ini, $('meDepSelect').value);
+  });
+}
+renderMeBar();
 
 /* ---------- Clasificacion general ----------
    Rankings "oficiales" = el combo marcado por DEFECTO en la pantalla de
@@ -518,10 +581,11 @@ function paintClasificacion(list){
   var host=$('clasifBody');
   if(!list.length){ host.innerHTML='<div class="hint">Todavía no hay marcas guardadas en los rankings oficiales.</div>'; return; }
   var html='<div class="clasif-list">';
+  var me=getMe();
   list.forEach(function(row, idx){
     var medal = idx===0?' gold':(idx===1?' silver':(idx===2?' bronze':''));
     var detalle = row.apps.map(function(a){ return esc(a.app)+' ('+a.pos+'º, +'+a.pts+')'; }).join(' · ');
-    html += '<div class="clasif-row">'
+    html += '<div class="clasif-row'+(me && row.name===me?' is-me':'')+'">'
       + '<div class="clasif-pos'+medal+'">'+(idx+1)+'</div>'
       + '<div class="clasif-mid"><div class="clasif-name">'+esc(row.name)+'</div><div class="clasif-detalle">'+detalle+'</div></div>'
       + '<div class="clasif-pts">'+row.points+'</div>'
@@ -709,8 +773,9 @@ function paintChampTable(c, data){
   data.columns.forEach(function(col){ thead+='<th>'+esc(col.label)+'<br>('+tipoLabel(col.tipo)+')</th>'; });
   thead+='<th>Total</th></tr>';
   var tbody='';
+  var me=getMe();
   data.rows.forEach(function(row){
-    tbody+='<tr><td class="champ-name-cell">'+esc(row.name)+'</td>';
+    tbody+='<tr'+(me && row.name===me?' class="is-me"':'')+'><td class="champ-name-cell">'+esc(row.name)+'</td>';
     data.columns.forEach(function(col, ci){
       var cell=row.cells[col.label+'#'+(ci+1)];
       if(!cell){ tbody+='<td class="champ-empty">&mdash;</td>'; return; }
