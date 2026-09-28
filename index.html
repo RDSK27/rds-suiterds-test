@@ -116,6 +116,18 @@ if('serviceWorker' in navigator){
   .champ-card .champ-actions button{flex:none;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;border-radius:6px;padding:5px 10px;cursor:pointer;border:1.5px solid var(--borde);background:#fff;color:#333;}
   .champ-card .champ-actions button.danger{border-color:#b03020;color:#b03020;}
   .champ-open{width:100%;margin-top:10px;background:var(--rojo);color:#fff;border:0;border-radius:6px;padding:9px;font-weight:900;letter-spacing:0.06em;text-transform:uppercase;font-size:11.5px;cursor:pointer;}
+
+  /* ---------- Clasificacion ---------- */
+  .clasif-list{display:flex;flex-direction:column;gap:6px;}
+  .clasif-row{display:flex;align-items:center;gap:10px;border:2px solid var(--borde);border-radius:8px;padding:8px 10px;}
+  .clasif-pos{flex:none;width:26px;height:26px;border-radius:50%;background:#eee;color:#555;font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center;}
+  .clasif-pos.gold{background:#f4cf5f;color:#7a5c00;}
+  .clasif-pos.silver{background:#d9d9d9;color:#555;}
+  .clasif-pos.bronze{background:#e2b184;color:#6b3d10;}
+  .clasif-mid{flex:1;min-width:0;}
+  .clasif-name{font-weight:800;font-size:13px;letter-spacing:0.02em;color:var(--negro);}
+  .clasif-detalle{font-size:10px;color:#999;line-height:1.4;margin-top:2px;}
+  .clasif-pts{flex:none;font-weight:900;font-size:17px;color:var(--rojo);min-width:26px;text-align:right;}
   .btn-new-champ{width:100%;background:#111;color:#fff;border:0;border-top:4px solid #b03020;border-radius:8px;padding:12px;font-weight:900;letter-spacing:0.08em;text-transform:uppercase;font-size:12.5px;cursor:pointer;margin-bottom:14px;}
 
   /* ---------- Formulario campeonato ---------- */
@@ -169,10 +181,11 @@ if('serviceWorker' in navigator){
     <!-- ================= CLASIFICACION ================= -->
     <section class="panel" id="panel-clasificacion">
       <div class="section-title">Clasificaci&#243;n general</div>
-      <div class="hint">
-        Pr&#243;ximamente: puntos acumulados (10 al 1&#186;, 9 al 2&#186;... hasta el 10&#186;)
-        en los rankings oficiales de cada app, sumados por persona.
+      <div class="hint" style="padding-top:0;padding-bottom:10px;">
+        10 puntos al 1&#186;, 9 al 2&#186;... hasta 1 al 10&#186; en el ranking oficial
+        (el marcado por defecto al entrar) de cada app, sumados por persona.
       </div>
+      <div id="clasifBody"></div>
     </section>
 
     <!-- ================= CAMPEONATOS ================= -->
@@ -188,7 +201,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v3</div>
+    <div class="app-ver">v4</div>
   </footer>
 
 </div>
@@ -196,7 +209,7 @@ if('serviceWorker' in navigator){
 <!-- Firebase (mismo proyecto compartido que el resto de la suite) -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
-import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, collection, addDoc, updateDoc, deleteDoc, doc, getDocs } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, collection, addDoc, updateDoc, deleteDoc, doc, getDocs, query, where } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 const firebaseConfig = {
   apiKey: "AIzaSyBbEgbWddPt_rhPM24bL_Nacp7TAlh1biM",
   authDomain: "rds-reaction-test.firebaseapp.com",
@@ -232,6 +245,21 @@ window.hubLoadChamps=async function(){
     return out;
   }catch(e){ return []; }
 };
+/* Lectura generica de una coleccion de ranking de cualquier app de la
+   suite, con hasta 3 filtros de igualdad (mismo patron where() que ya usa
+   cada app para su propio ranking -- los indices compuestos que hacen
+   falta ya existen, porque son la MISMA consulta que la app original). */
+window.hubFetchRanking=async function(collName, matchObj){
+  if(!db) return [];
+  try{
+    var constraints=[];
+    if(matchObj){ for(var k in matchObj){ constraints.push(where(k, '==', matchObj[k])); } }
+    var q = constraints.length ? query(collection(db,collName), ...constraints) : collection(db,collName);
+    const snap=await getDocs(q);
+    const out=[]; snap.forEach(function(d){ out.push(d.data()); });
+    return out;
+  }catch(e){ return null; }
+};
 </script>
 
 <script>
@@ -266,7 +294,9 @@ function showTab(id){
 }
 $('tabs').addEventListener('click', function(e){
   var b=e.target.closest('button'); if(!b) return;
-  showTab(b.getAttribute('data-tab'));
+  var id=b.getAttribute('data-tab');
+  showTab(id);
+  if(id==='clasificacion') renderClasificacion();
 });
 
 /* ---------- Rankings: rejilla de botones ---------- */
@@ -283,6 +313,110 @@ function renderAppGrid(){
   });
 }
 renderAppGrid();
+
+/* ---------- Clasificacion general ----------
+   Rankings "oficiales" = el combo marcado por DEFECTO en la pantalla de
+   inicio de cada app (2026-09-28, pedido expreso). Gimnasia, Karate y
+   Tenis se excluyen de momento (pedido expreso) -- quedan fuera de esta
+   lista aunque aparezcan en Rankings.
+   match:null en reaction-test porque esa app ya reparte el ranking en una
+   coleccion POR combinacion (scores_reaction_<rondas>_<modo>_<pulso>_
+   <sonido>) en vez de filtrar con where() sobre una unica coleccion como
+   el resto -- no hace falta filtro, la coleccion ya es justo ese combo. */
+var OFFICIAL_RANKINGS=[
+  { slug:'rds-ballcoordination-test', name:'Ball Coordination',
+    collection:'scores_ballcoordination', match:{mode:'normal', count:15, penaliza:true},
+    metric:'avgRT', better:'lower' },
+  { slug:'rds-lightsreaction-test', name:'Lights Speed',
+    collection:'scores_lights', match:{mode:'normal', stim:'cambia', total:15},
+    metric:'avg', better:'lower' },
+  { slug:'rds-perception-test', name:'Perception',
+    collection:'scores_perception', match:{mode:'normal', stim:'fijo', total:5},
+    metric:'avg', better:'lower' },
+  { slug:'rds-processing-test', name:'Processing',
+    collection:'scores_processing', match:{mode:'normal', stim:'cambia', total:15},
+    metric:'avg', better:'lower' },
+  { slug:'rds-rallymemory-test', name:'Rally Memory',
+    collection:'scores_rallymemory', match:{mode:'normal', stim:'normal', total:5},
+    metric:'avg', better:'lower' },
+  { slug:'rds-reaction-test', name:'Velocidad de Reacción',
+    collection:'scores_reaction_10_normal_press_sound', match:null,
+    metric:'avg', better:'lower' },
+  { slug:'rds-circuit-test', name:'Circuit Reaction',
+    collection:'scores_circuit', match:{s1:'nor', s2:'lem', s3:'3'},
+    metric:'avg', better:'lower' },
+  { slug:'rds-memorycards-test', name:'Memory Cards',
+    collection:'scores_memorycards', match:{modo:'normal'},
+    metric:'cards', better:'higher' },
+  { slug:'rds-reactiontrial-test', name:'Reaction Trial',
+    collection:'scores_reactiontrial', match:{s1:'normal', s2:'15', s3:'nonstop'},
+    metric:'avg', better:'lower' }
+];
+/* Mejor marca de cada persona (por nombre exacto, tal como lo escribio
+   -- INI o INI-DEPORTE) dentro de un ranking, sin repetidos. */
+function dedupeBest(docs, metric, better){
+  var map={};
+  docs.forEach(function(d){
+    var val=d[metric];
+    if(val==null || !isFinite(val)) return;
+    var nm=(d.name||'').trim().toUpperCase(); if(!nm) return;
+    var cur=map[nm];
+    var isBetter = !cur || (better==='lower' ? val<cur.val : val>cur.val);
+    if(isBetter) map[nm]={name:nm, val:val};
+  });
+  var arr=Object.keys(map).map(function(k){ return map[k]; });
+  arr.sort(function(a,b){ return better==='lower' ? a.val-b.val : b.val-a.val; });
+  return arr;
+}
+function pointsFor(pos){ return pos<10 ? (10-pos) : 0; }  // pos=0 -> 10, pos=9 -> 1, pos>=10 -> 0
+var CLASIF_CACHE=null;
+async function computeClasificacion(){
+  var totals={};
+  for(var i=0;i<OFFICIAL_RANKINGS.length;i++){
+    var cfg=OFFICIAL_RANKINGS[i];
+    var docs = await window.hubFetchRanking(cfg.collection, cfg.match);
+    if(!docs) continue;   // fallo de lectura en esa app -- se omite, no rompe el resto
+    var ranked=dedupeBest(docs, cfg.metric, cfg.better);
+    ranked.slice(0,10).forEach(function(r, idx){
+      var pts=pointsFor(idx);
+      if(!totals[r.name]) totals[r.name]={ name:r.name, points:0, apps:[] };
+      totals[r.name].points += pts;
+      totals[r.name].apps.push({ app:cfg.name, pos:idx+1, pts:pts });
+    });
+  }
+  var list=Object.keys(totals).map(function(k){ return totals[k]; });
+  list.sort(function(a,b){ return b.points-a.points; });
+  return list;
+}
+async function renderClasificacion(){
+  var host=$('clasifBody');
+  if(CLASIF_CACHE){ paintClasificacion(CLASIF_CACHE); return; }
+  host.innerHTML='<div class="hint">Calculando…</div>';
+  try{
+    var list=await computeClasificacion();
+    CLASIF_CACHE=list;
+    paintClasificacion(list);
+  }catch(e){
+    host.innerHTML='<div class="hint">No se pudo calcular la clasificación. Comprueba la conexión.</div>';
+  }
+}
+function paintClasificacion(list){
+  var host=$('clasifBody');
+  if(!list.length){ host.innerHTML='<div class="hint">Todavía no hay marcas guardadas en los rankings oficiales.</div>'; return; }
+  var html='<div class="clasif-list">';
+  list.forEach(function(row, idx){
+    var medal = idx===0?' gold':(idx===1?' silver':(idx===2?' bronze':''));
+    var detalle = row.apps.map(function(a){ return esc(a.app)+' ('+a.pos+'º, +'+a.pts+')'; }).join(' · ');
+    html += '<div class="clasif-row">'
+      + '<div class="clasif-pos'+medal+'">'+(idx+1)+'</div>'
+      + '<div class="clasif-mid"><div class="clasif-name">'+esc(row.name)+'</div><div class="clasif-detalle">'+detalle+'</div></div>'
+      + '<div class="clasif-pts">'+row.points+'</div>'
+      + '</div>';
+  });
+  html+='</div><button class="add-prueba" id="btnRefreshClasif" style="margin-top:14px;">Actualizar</button>';
+  host.innerHTML=html;
+  $('btnRefreshClasif').addEventListener('click', function(){ CLASIF_CACHE=null; renderClasificacion(); });
+}
 
 /* ---------- Admin ----------
    Sin login de verdad (como el resto de la suite): una clave fija que se
