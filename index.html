@@ -159,9 +159,11 @@ if('serviceWorker' in navigator){
   .champ-form-actions .cancel{background:#eee;color:#555;}
 
   /* ---------- Login admin ---------- */
-  .admin-login{border:2px solid var(--rojo);border-radius:10px;padding:14px;margin-bottom:14px;background:#fff8f7;display:flex;gap:8px;}
+  .admin-login-wrap{border:2px solid var(--rojo);border-radius:10px;padding:14px;margin-bottom:14px;background:#fff8f7;}
+  .admin-login{display:flex;gap:8px;}
   .admin-login input{flex:1;padding:9px 10px;border:2px solid var(--borde);border-radius:6px;font-size:14px;letter-spacing:0.1em;font-family:inherit;}
   .admin-login button{flex:none;background:var(--rojo);color:#fff;border:0;border-radius:6px;padding:0 16px;font-weight:900;letter-spacing:0.05em;text-transform:uppercase;font-size:11.5px;cursor:pointer;}
+  .admin-login-err{color:#b03020;font-size:11.5px;font-weight:700;margin-top:8px;}
 
   footer{ text-align:center;color:var(--tx-gris);font-weight:600;letter-spacing:2px; font-size:10px;text-transform:uppercase;padding:6px 12px 10px;background:#fff; }
   .app-ver{ text-align:center; color:#cfcfcf; font-size:0.66rem; letter-spacing:0.1em; padding:2px 0 0; }
@@ -217,7 +219,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v6</div>
+    <div class="app-ver">v7</div>
   </footer>
 
 </div>
@@ -482,9 +484,12 @@ function renderAdminBar(){
 function closeAdminLogin(){ $('adminLoginBox').innerHTML=''; }
 function renderAdminLogin(){
   var box=$('adminLoginBox');
-  box.innerHTML='<div class="admin-login">'
+  box.innerHTML='<div class="admin-login-wrap">'
+    +'<div class="admin-login">'
     +'<input type="text" id="adminPinInput" placeholder="Clave admin" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">'
     +'<button id="btnAdminGo">Entrar</button>'
+    +'</div>'
+    +'<div class="admin-login-err" id="adminLoginErr" style="display:none;">Clave incorrecta. Prueba otra vez.</div>'
     +'</div>';
   $('btnAdminGo').addEventListener('click', function(){
     var v=($('adminPinInput').value||'').trim();
@@ -493,6 +498,7 @@ function renderAdminLogin(){
       closeAdminLogin(); renderAdminBar();
     } else {
       $('adminPinInput').style.borderColor='#b03020';
+      $('adminLoginErr').style.display='';
     }
   });
 }
