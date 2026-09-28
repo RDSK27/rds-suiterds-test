@@ -1,5 +1,5 @@
 /* SuiteRDS - Service Worker */
-var CACHE = 'suiterds-v1';
+var CACHE = 'suiterds-v2';
 var ASSETS = [
   './',
   './index.html',
@@ -7,7 +7,8 @@ var ASSETS = [
   './icon-192.png',
   './icon-512.png',
   './apple-touch-icon.png',
-  './banner.jpg'
+  './banner.jpg',
+  './logo.png'
 ];
 
 self.addEventListener('install', function(e){

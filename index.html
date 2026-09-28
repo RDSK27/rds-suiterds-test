@@ -73,7 +73,9 @@ if('serviceWorker' in navigator){
   header img{ width:100%; height:auto; display:block; }
   .subtitle{ display:block; width:100%; box-sizing:border-box; font-size:0.58rem; letter-spacing:0.14em; color:#cfcfcf; text-transform:none; padding:8px 0; text-align:center; background:#000000; }
 
-  h1.title{ text-align:center;font-weight:900;letter-spacing:0.08em;line-height:1; font-size:1.7rem;color:var(--negro);text-transform:uppercase;margin:10px 0 0; }
+  h1.title{ text-align:center;font-weight:900;letter-spacing:0.04em;line-height:1; font-size:1.7rem;color:var(--negro);margin:10px 0 0; }
+  .logo-wrap{display:flex;justify-content:center;padding:0;}
+  .logo-wrap img{width:88px;width:min(24vw,88px,11svh);height:auto;display:block;margin:6px auto 0;border-radius:50%;}
 
   /* ---------- Pestanas (Rankings / Clasificacion / Campeonatos) ---------- */
   .tabs{ display:flex;border-top:4px solid #b03020;border-bottom:1px solid #333;background:#111;flex-shrink:0; }
@@ -148,6 +150,7 @@ if('serviceWorker' in navigator){
   </header>
 
   <h1 class="title">SuiteRDS</h1>
+  <div class="logo-wrap"><img src="logo.png" alt="RDS"></div>
 
   <div class="tabs" id="tabs">
     <button class="sel" data-tab="rankings">Rankings</button>
@@ -185,7 +188,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v1</div>
+    <div class="app-ver">v2</div>
   </footer>
 
 </div>
