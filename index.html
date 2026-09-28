@@ -182,8 +182,9 @@ if('serviceWorker' in navigator){
     <section class="panel" id="panel-clasificacion">
       <div class="section-title">Clasificaci&#243;n general</div>
       <div class="hint" style="padding-top:0;padding-bottom:10px;">
-        10 puntos al 1&#186;, 9 al 2&#186;... hasta 1 al 10&#186; en el ranking oficial
-        (el marcado por defecto al entrar) de cada app, sumados por persona.
+        Puntos estilo Mundial de MotoGP (25 al 1&#186;, 20 al 2&#186;, 16 al 3&#186;...
+        hasta 1 al 15&#186;) en el ranking oficial (el marcado por defecto al entrar)
+        de cada app, sumados por persona.
       </div>
       <div id="clasifBody"></div>
     </section>
@@ -201,7 +202,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v4</div>
+    <div class="app-ver">v5</div>
   </footer>
 
 </div>
@@ -316,9 +317,9 @@ renderAppGrid();
 
 /* ---------- Clasificacion general ----------
    Rankings "oficiales" = el combo marcado por DEFECTO en la pantalla de
-   inicio de cada app (2026-09-28, pedido expreso). Gimnasia, Karate y
-   Tenis se excluyen de momento (pedido expreso) -- quedan fuera de esta
-   lista aunque aparezcan en Rankings.
+   inicio de cada app (2026-09-28, pedido expreso). Gimnasia, Karate, Tenis
+   y Rally Memory se excluyen de momento (pedido expreso) -- quedan fuera
+   de esta lista aunque aparezcan en Rankings.
    match:null en reaction-test porque esa app ya reparte el ranking en una
    coleccion POR combinacion (scores_reaction_<rondas>_<modo>_<pulso>_
    <sonido>) en vez de filtrar con where() sobre una unica coleccion como
@@ -335,9 +336,6 @@ var OFFICIAL_RANKINGS=[
     metric:'avg', better:'lower' },
   { slug:'rds-processing-test', name:'Processing',
     collection:'scores_processing', match:{mode:'normal', stim:'cambia', total:15},
-    metric:'avg', better:'lower' },
-  { slug:'rds-rallymemory-test', name:'Rally Memory',
-    collection:'scores_rallymemory', match:{mode:'normal', stim:'normal', total:5},
     metric:'avg', better:'lower' },
   { slug:'rds-reaction-test', name:'Velocidad de Reacción',
     collection:'scores_reaction_10_normal_press_sound', match:null,
@@ -368,7 +366,11 @@ function dedupeBest(docs, metric, better){
   arr.sort(function(a,b){ return better==='lower' ? a.val-b.val : b.val-a.val; });
   return arr;
 }
-function pointsFor(pos){ return pos<10 ? (10-pos) : 0; }  // pos=0 -> 10, pos=9 -> 1, pos>=10 -> 0
+/* Puntos por puesto = escala oficial del Mundial de MotoGP (pedido
+   expreso, 2026-09-28): 25 al 1o, 20 al 2o, 16 al 3o, 13, 11, 10, 9, 8, 7,
+   6, 5, 4, 3, 2, 1 -- hasta el 15o puesto, 0 a partir de ahi. */
+var MOTOGP_POINTS=[25,20,16,13,11,10,9,8,7,6,5,4,3,2,1];
+function pointsFor(pos){ return pos<MOTOGP_POINTS.length ? MOTOGP_POINTS[pos] : 0; }  // pos=0 -> 25 ... pos=14 -> 1
 var CLASIF_CACHE=null;
 async function computeClasificacion(){
   var totals={};
@@ -377,7 +379,7 @@ async function computeClasificacion(){
     var docs = await window.hubFetchRanking(cfg.collection, cfg.match);
     if(!docs) continue;   // fallo de lectura en esa app -- se omite, no rompe el resto
     var ranked=dedupeBest(docs, cfg.metric, cfg.better);
-    ranked.slice(0,10).forEach(function(r, idx){
+    ranked.slice(0,MOTOGP_POINTS.length).forEach(function(r, idx){
       var pts=pointsFor(idx);
       if(!totals[r.name]) totals[r.name]={ name:r.name, points:0, apps:[] };
       totals[r.name].points += pts;
