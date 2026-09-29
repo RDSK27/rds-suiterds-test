@@ -255,7 +255,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v21</div>
+    <div class="app-ver">v22</div>
   </footer>
 
 </div>
@@ -418,15 +418,30 @@ var APPS=[
 ];
 /* Si ya me he marcado ("quien soy"), se pasa por la URL al abrir la app --
    cada una de las 12 sabe leer ?ini=&dep= (2026-09-28) y se autorrellena/
-   resalta como si lo hubiera escrito alli mismo. Sin marcar, URL normal. */
+   resalta como si lo hubiera escrito alli mismo. Sin marcar, sin esos dos.
+
+   Ademas (2026-09-29) se pasa SIEMPRE ?k=<clave>: para llegar a pulsar
+   estos botones ya se paso la propia pantalla de clave de SuiteRDS, asi
+   que la app de destino puede fiarse al instante sin depender de que
+   localStorage se comparta entre SuiteRDS y esa app -- en iOS cada icono
+   instalado por separado tiene su propio almacenamiento aislado, y
+   entrar via estos botones a veces cae en un contenedor que nunca vio la
+   clave, dejando la pantalla de clave bloqueada sin poder avanzar estando
+   sin red. Con ?k=, la app de destino confia al momento (ver checkGate en
+   cada una de las 12), sin esperar a Firestore. */
 function appUrl(slug){
   var url='https://rdsk27.github.io/'+slug+'/';
+  var params=[];
   var me=getMe();
   if(me){
     var parts=me.split('-');
     var ini=parts[0]||'', dep=parts.slice(1).join('-')||'';
-    url += '?ini='+encodeURIComponent(ini)+'&dep='+encodeURIComponent(dep);
+    params.push('ini='+encodeURIComponent(ini));
+    params.push('dep='+encodeURIComponent(dep));
   }
+  var myKey=null; try{ myKey=localStorage.getItem('rds_suite_access_key'); }catch(e){}
+  if(myKey){ params.push('k='+encodeURIComponent(myKey)); }
+  if(params.length){ url += '?'+params.join('&'); }
   return url;
 }
 
