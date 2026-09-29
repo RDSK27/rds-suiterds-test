@@ -255,7 +255,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v17</div>
+    <div class="app-ver">v18</div>
   </footer>
 
 </div>
@@ -447,6 +447,50 @@ function renderAppGrid(){
   });
 }
 renderAppGrid();
+
+/* Precalentar las 12 apps para que funcionen offline (2026-09-29): al
+   abrir SuiteRDS con conexion, se cargan una a una en iframes invisibles
+   para que cada una registre su propio Service Worker y guarde su
+   cache -- asi no hace falta entrar a mano en cada una para que quede
+   disponible sin red despues (entrar y salir rapido desde el ranking no
+   le daba tiempo a terminar de cachear). Secuencial, no las 12 a la vez,
+   para no saturar una wifi floja de gimnasio. Se usa
+   navigator.serviceWorker.ready DEL PROPIO IFRAME (mismo origen, se
+   puede acceder sin problema de CORS) como señal de que ya termino de
+   cachear -- si algo falla o tarda, un margen de seguridad de 12s por
+   app evita que se quede esperando para siempre. */
+function warmApp(slug){
+  return new Promise(function(resolve){
+    var done=false;
+    var iframe=document.createElement('iframe');
+    iframe.style.cssText='position:absolute;width:0;height:0;border:0;visibility:hidden;';
+    iframe.src='https://rdsk27.github.io/'+slug+'/';
+    function finish(){
+      if(done) return; done=true;
+      clearTimeout(safety);
+      try{ iframe.remove(); }catch(e){}
+      resolve();
+    }
+    var safety=setTimeout(finish, 12000);
+    iframe.addEventListener('load', function(){
+      try{
+        var w=iframe.contentWindow;
+        if(w && w.navigator && w.navigator.serviceWorker){
+          w.navigator.serviceWorker.ready.then(finish).catch(finish);
+        }
+      }catch(e){}
+    });
+    iframe.addEventListener('error', finish);
+    document.body.appendChild(iframe);
+  });
+}
+async function warmAllApps(){
+  if(!navigator.onLine) return;
+  for(var i=0;i<APPS.length;i++){
+    await warmApp(APPS[i].slug);
+  }
+}
+warmAllApps();
 
 /* ---------- "Quien soy": resalta mi fila en Clasificacion y Campeonatos ----------
    Independiente del INI+deporte que cada una de las 12 apps guarda por su
