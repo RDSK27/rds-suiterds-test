@@ -241,7 +241,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v13</div>
+    <div class="app-ver">v14</div>
   </footer>
 
 </div>
@@ -445,24 +445,116 @@ renderMeBar();
 var APP_ADAPTERS=[
   { slug:'rds-ballcoordination-test', name:'Ball Coordination',
     collection:'scores_ballcoordination', match:{mode:'normal', count:15, penaliza:true},
-    metric:'avgRT', better:'lower', unidad:'ms', inClasif:true },
+    metric:'avgRT', better:'lower', unidad:'ms', inClasif:true,
+    /* "penaliza" no es una opcion que elija el jugador: la propia app la fija
+       sola (true en normal/extremo, false en limite) -- se deriva de "mode",
+       no se ofrece como dim aparte. "count" tampoco aplica en limite (esa
+       app tiene un unico ranking combinado ahi, sin ensayos). */
+    dims:[
+      { key:'mode', label:'Modo', def:'normal', options:[
+          {value:'normal',label:'Normal'},{value:'extremo',label:'Extremo'},{value:'limite',label:'Límite'} ] },
+      { key:'count', label:'Ensayos', def:'15', options:[
+          {value:'15',label:'15'},{value:'30',label:'30'},{value:'50',label:'50'} ] }
+    ],
+    dimLabel:function(v){
+      var modeLbl={normal:'Normal',extremo:'Extremo',limite:'Límite'}[v.mode||'normal'];
+      return v.mode==='limite' ? modeLbl : (modeLbl+', '+(v.count||'15'));
+    },
+    buildMatch:function(v){
+      if(v.mode==='limite') return { mode:'limite', count:0, penaliza:false };
+      return { mode:v.mode||'normal', count:parseInt(v.count||'15',10), penaliza:true };
+    },
+    disabledDim:function(v, key){ return key==='count' && v.mode==='limite'; } },
   { slug:'rds-lightsreaction-test', name:'Lights Speed',
     collection:'scores_lights', match:{mode:'normal', stim:'cambia', total:15},
-    metric:'avg', better:'lower', unidad:'ms', inClasif:true },
+    metric:'avg', better:'lower', unidad:'ms', inClasif:true,
+    /* En limite, la propia app fuerza "estimulo" a cambia (sin espera) --
+       no se ofrece "fijo" como opcion cuando el modo es limite. */
+    dims:[
+      { key:'mode', label:'Modo', def:'normal', options:[
+          {value:'normal',label:'Normal 1'},{value:'2pods',label:'Normal 2'},
+          {value:'extremo',label:'Extremo'},{value:'limite',label:'Límite'} ] },
+      { key:'stim', label:'Estímulo', def:'cambia', options:[
+          {value:'cambia',label:'Sin espera'},{value:'fijo',label:'Con espera'} ] },
+      { key:'total', label:'Ensayos', def:'15', options:[
+          {value:'15',label:'15'},{value:'30',label:'30'},{value:'60',label:'60'} ] }
+    ],
+    dimLabel:function(v){
+      var modeLbl={normal:'Normal 1','2pods':'Normal 2',extremo:'Extremo',limite:'Límite'}[v.mode||'normal'];
+      var stim=v.mode==='limite'?'cambia':(v.stim||'cambia');
+      var stimLbl={cambia:'Sin espera',fijo:'Con espera'}[stim];
+      return modeLbl+', '+stimLbl+', '+(v.total||'15');
+    },
+    buildMatch:function(v){
+      var stim=v.mode==='limite'?'cambia':(v.stim||'cambia');
+      return { mode:v.mode||'normal', stim:stim, total:parseInt(v.total||'15',10) };
+    },
+    constrain:function(v){ if(v.mode==='limite') v.stim='cambia'; },
+    disabledDim:function(v, key){ return key==='stim' && v.mode==='limite'; } },
   { slug:'rds-perception-test', name:'Perception',
     collection:'scores_perception', match:{mode:'normal', stim:'fijo', total:5},
-    metric:'avg', better:'lower', unidad:'ms', inClasif:true },
+    metric:'avg', better:'lower', unidad:'ms', inClasif:true,
+    dims:[
+      { key:'mode', label:'Modo', def:'normal', options:[
+          {value:'normal',label:'Normal'},{value:'extremo',label:'Extremo'},{value:'limite',label:'Límite'} ] },
+      { key:'stim', label:'Estímulo', def:'fijo', options:[
+          {value:'fijo',label:'Fijo'},{value:'cambia',label:'Cambia'} ] },
+      { key:'total', label:'Ensayos', def:'5', options:[
+          {value:'5',label:'5'},{value:'15',label:'15'},{value:'25',label:'25'} ] }
+    ],
+    dimLabel:function(v){
+      var modeLbl={normal:'Normal',extremo:'Extremo',limite:'Límite'}[v.mode||'normal'];
+      var stimLbl={fijo:'Fijo',cambia:'Cambia'}[v.stim||'fijo'];
+      return modeLbl+', '+stimLbl+', '+(v.total||'5');
+    },
+    buildMatch:function(v){
+      return { mode:v.mode||'normal', stim:v.stim||'fijo', total:parseInt(v.total||'5',10) };
+    } },
   { slug:'rds-processing-test', name:'Processing',
     collection:'scores_processing', match:{mode:'normal', stim:'cambia', total:15},
-    metric:'avg', better:'lower', unidad:'ms', inClasif:true },
+    metric:'avg', better:'lower', unidad:'ms', inClasif:true,
+    /* Sin bloqueos: los 3x2x3 combos de modo/estimulo/ensayos son validos. */
+    dims:[
+      { key:'mode', label:'Modo', def:'normal', options:[
+          {value:'normal',label:'Normal'},{value:'extremo',label:'Extremo'},{value:'limite',label:'Límite'} ] },
+      { key:'stim', label:'Estímulo', def:'cambia', options:[
+          {value:'cambia',label:'Sin espera'},{value:'fijo',label:'Con espera'} ] },
+      { key:'total', label:'Ensayos', def:'15', options:[
+          {value:'15',label:'15'},{value:'25',label:'25'},{value:'50',label:'50'} ] }
+    ],
+    dimLabel:function(v){
+      var modeLbl={normal:'Normal',extremo:'Extremo',limite:'Límite'}[v.mode||'normal'];
+      var stimLbl={cambia:'Sin espera',fijo:'Con espera'}[v.stim||'cambia'];
+      return modeLbl+', '+stimLbl+', '+(v.total||'15');
+    },
+    buildMatch:function(v){
+      return { mode:v.mode||'normal', stim:v.stim||'cambia', total:parseInt(v.total||'15',10) };
+    } },
   { slug:'rds-rallymemory-test', name:'Rally Memory',
     collection:'scores_rallymemory', match:{mode:'normal', stim:'normal', total:5},
-    metric:'avg', better:'lower', unidad:'ms', inClasif:false },
+    metric:'avg', better:'lower', unidad:'ms', inClasif:false,
+    /* No hay selector de estimulo (siempre "normal"); en limite los
+       ensayos quedan fijos a 0 (ranking combinado de esa app). */
+    dims:[
+      { key:'mode', label:'Modo', def:'normal', options:[
+          {value:'normal',label:'Normal'},{value:'extremo',label:'Extremo'},{value:'limite',label:'Límite'} ] },
+      { key:'total', label:'Ensayos', def:'5', options:[
+          {value:'5',label:'5'},{value:'7',label:'7'},{value:'10',label:'10'} ] }
+    ],
+    dimLabel:function(v){
+      var modeLbl={normal:'Normal',extremo:'Extremo',limite:'Límite'}[v.mode||'normal'];
+      return v.mode==='limite' ? modeLbl : (modeLbl+', '+(v.total||'5'));
+    },
+    buildMatch:function(v){
+      if(v.mode==='limite') return { mode:'limite', stim:'normal', total:0 };
+      return { mode:v.mode||'normal', stim:'normal', total:parseInt(v.total||'5',10) };
+    },
+    disabledDim:function(v, key){ return key==='total' && v.mode==='limite'; } },
   { slug:'rds-reaction-test', name:'Velocidad de Reacción',
     collection:'scores_reaction_10_normal_press_sound', match:null,
     metric:'avg', better:'lower', unidad:'ms', inClasif:true,
-    /* Unica app con "dims": permite elegir un combo DISTINTO al oficial en
-       Campeonatos (pedido expreso, 2026-09-28 -- "Go/NoGo, 15, subir").
+    /* Permite elegir un combo DISTINTO al oficial en Campeonatos (pedido
+       expreso, 2026-09-28 -- "Go/NoGo, 15, subir").
        Limite NO esta en las opciones a proposito: guarda "completed" en
        vez de "avg" (mismo patron que Ball Coordination Limite), y no se ha
        verificado ese caso -- mejor no ofrecerlo que ofrecer una tabla mal.
@@ -508,16 +600,153 @@ var APP_ADAPTERS=[
     } },
   { slug:'rds-circuit-test', name:'Circuit Reaction',
     collection:'scores_circuit', match:{s1:'nor', s2:'lem', s3:'3'},
-    metric:'avg', better:'lower', unidad:'s', inClasif:true },
+    metric:'avg', better:'lower', unidad:'s', inClasif:true,
+    dims:[
+      { key:'s1', label:'Modo', def:'nor', options:[
+          {value:'nor',label:'Normal'},{value:'ext',label:'Extremo'},{value:'lim',label:'Límite'} ] },
+      { key:'s2', label:'Personaje', def:'lem', options:[
+          {value:'lem',label:'LEM'},{value:'ara',label:'ARA'},{value:'cam',label:'CAM'},
+          {value:'chv',label:'CHV'},{value:'mtk',label:'MTK'},{value:'zue',label:'ZUE'} ] },
+      { key:'s3', label:'Vidas', def:'3', options:[
+          {value:'3',label:'3'},{value:'5',label:'5'},{value:'10',label:'10'} ] }
+    ],
+    dimLabel:function(v){
+      var modeLbl={nor:'Normal',ext:'Extremo',lim:'Límite'}[v.s1||'nor'];
+      return modeLbl+', '+(v.s2||'lem').toUpperCase()+', '+(v.s3||'3');
+    },
+    buildMatch:function(v){
+      return { s1:v.s1||'nor', s2:v.s2||'lem', s3:v.s3||'3' };
+    } },
   { slug:'rds-gimnasia-test', name:'Gimnasia',
     collection:'scores_gimnasia', match:null,
     metric:'avg', better:'higher', unidad:'pts', inClasif:false },
   { slug:'rds-memorycards-test', name:'Memory Cards',
     collection:'scores_memorycards', match:{modo:'normal'},
-    metric:'cards', better:'higher', unidad:'cartas', inClasif:true },
+    metric:'cards', better:'higher', unidad:'cartas', inClasif:true,
+    /* La baraja (francesa/espanola) es solo visual, no se guarda -- unico
+       dim real es "modo". */
+    dims:[
+      { key:'modo', label:'Modo', def:'normal', options:[
+          {value:'normal',label:'Normal'},{value:'extremo',label:'Extremo'},{value:'limite',label:'Límite'} ] }
+    ],
+    dimLabel:function(v){ return {normal:'Normal',extremo:'Extremo',limite:'Límite'}[v.modo||'normal']; },
+    buildMatch:function(v){ return { modo:v.modo||'normal' }; } },
   { slug:'rds-reactiontrial-test', name:'Reaction Trial',
     collection:'scores_reactiontrial', match:{s1:'normal', s2:'15', s3:'nonstop'},
-    metric:'avg', better:'lower', unidad:'ms', inClasif:true }
+    metric:'avg', better:'lower', unidad:'ms', inClasif:true,
+    /* OJO etiquetas cambiadas (ver comentario en la propia app): el boton
+       que se VE como "Extremo" guarda internamente s1:'limite', y el que
+       se VE como "Limite" guarda s1:'extremo'. Aqui se usan esos mismos
+       valores/etiquetas para que lo que el admin ve coincida con la app.
+       Trial es un 4o modo con S2=zonas(6/12) y S3 vacio -- se reutiliza el
+       mismo select de ensayos (deshabilitando las opciones que no tocan)
+       para no complicar el motor de "dims". */
+    dims:[
+      { key:'s1', label:'Modo', def:'normal', options:[
+          {value:'normal',label:'Normal'},{value:'limite',label:'Extremo'},
+          {value:'extremo',label:'Límite'},{value:'trial',label:'Trial'} ] },
+      { key:'s2', label:'Ensayos', def:'15', options:[
+          {value:'15',label:'15'},{value:'30',label:'30'},{value:'50',label:'50'},
+          {value:'6',label:'6 zonas'},{value:'12',label:'12 zonas'} ] },
+      { key:'s3', label:'Ritmo', def:'nonstop', options:[
+          {value:'nonstop',label:'Non-stop'},{value:'pausa',label:'Pausa'} ] }
+    ],
+    dimLabel:function(v){
+      var modeLbl={normal:'Normal',limite:'Extremo',extremo:'Límite',trial:'Trial'}[v.s1||'normal'];
+      if(v.s1==='trial') return modeLbl+', '+(v.s2||'6')+' zonas';
+      var ritmoLbl={nonstop:'Non-stop',pausa:'Pausa'}[v.s3||'nonstop'];
+      return modeLbl+', '+(v.s2||'15')+', '+ritmoLbl;
+    },
+    buildMatch:function(v){
+      if(v.s1==='trial') return { s1:'trial', s2:(v.s2==='12'?'12':'6'), s3:'' };
+      return { s1:v.s1||'normal', s2:v.s2||'15', s3:v.s3||'nonstop' };
+    },
+    constrain:function(v){
+      if(v.s1==='trial'){ if(v.s2!=='6' && v.s2!=='12') v.s2='6'; }
+      else if(v.s2==='6' || v.s2==='12'){ v.s2='15'; }
+    },
+    disabledDim:function(v, key){ return key==='s3' && v.s1==='trial'; },
+    disabledOption:function(v, key, val){
+      if(key!=='s2') return false;
+      return v.s1==='trial' ? (val==='15'||val==='30'||val==='50') : (val==='6'||val==='12');
+    } },
+  { slug:'rds-reactiontenis-test', name:'Reaction Tenis',
+    collection:'scores_reactiontenis', match:{mode:'normal', disc:'tenis', count:0, penaliza:true},
+    metric:'avgRT', better:'lower', unidad:'ms', inClasif:false,
+    /* No estaba en Campeonatos hasta ahora. "count" (set a 4/6) solo
+       importa en Set/Partido (en Juego/Infinito/Peloteo se guarda 0).
+       "penaliza" siempre es true en esta app (no es una opcion). No se
+       filtra por matchMode (azar/tactica): no es fiable para "Juego" y
+       complicaria el formulario sin necesidad real. */
+    dims:[
+      { key:'mode', label:'Modo', def:'normal', options:[
+          {value:'normal',label:'Juego'},{value:'extremo',label:'Set'},{value:'limite',label:'Partido'},
+          {value:'infinito',label:'Infinito'},{value:'peloteo',label:'Peloteo'} ] },
+      { key:'disc', label:'Disciplina', def:'tenis', options:[
+          {value:'tenis',label:'Tenis'},{value:'padel',label:'Pádel'} ] },
+      { key:'count', label:'Set a', def:'4', options:[
+          {value:'4',label:'4'},{value:'6',label:'6'} ] }
+    ],
+    dimLabel:function(v){
+      var modeLbl={normal:'Juego',extremo:'Set',limite:'Partido',infinito:'Infinito',peloteo:'Peloteo'}[v.mode||'normal'];
+      var discLbl={tenis:'Tenis',padel:'Pádel'}[v.disc||'tenis'];
+      var withCount=(v.mode==='extremo'||v.mode==='limite');
+      return (withCount ? (modeLbl+' a '+(v.count||'4')) : modeLbl)+', '+discLbl;
+    },
+    buildMatch:function(v){
+      var withCount=(v.mode==='extremo'||v.mode==='limite');
+      return { mode:v.mode||'normal', disc:v.disc||'tenis', penaliza:true, count:withCount?parseInt(v.count||'4',10):0 };
+    },
+    disabledDim:function(v, key){ return key==='count' && !(v.mode==='extremo'||v.mode==='limite'); } },
+  { slug:'rds-reactionkarate-test', name:'Reaction Karate',
+    collection:'scores_reactionkarate', match:{s1:'def', s2:'10', s3:'paus'},
+    metric:'avg', better:'lower', unidad:'ms', inClasif:false,
+    /* No estaba en Campeonatos hasta ahora. Defensa/Ataque: s2=ensayos,
+       s3 siempre "paus". Combate/Campeonato: s2=tiempo(60/120/180),
+       s3=estrategia -- el "ensayos" del home no aplica ahi. Mismo truco
+       que Reaction Trial: un solo select de s2 con opciones deshabilitadas
+       segun el modo, para no ampliar el motor de "dims". */
+    dims:[
+      { key:'s1', label:'Modo', def:'def', options:[
+          {value:'def',label:'Defensa'},{value:'atk',label:'Ataque'},
+          {value:'cmb',label:'Combate'},{value:'champ',label:'Campeonato'} ] },
+      { key:'s2', label:'Ensayos / Tiempo', def:'10', options:[
+          {value:'10',label:'10'},{value:'25',label:'25'},{value:'50',label:'50'},
+          {value:'60',label:'1 min'},{value:'120',label:'2 min'},{value:'180',label:'3 min'} ] },
+      { key:'s3', label:'Estrategia', def:'paus', options:[
+          {value:'libre',label:'Libre'},{value:'tactica',label:'Táctica'} ] }
+    ],
+    dimLabel:function(v){
+      var isCombat=(v.s1==='cmb'||v.s1==='champ');
+      var modeLbl={def:'Defensa',atk:'Ataque',cmb:'Combate',champ:'Campeonato'}[v.s1||'def'];
+      if(isCombat){
+        var timeLbl={'60':'1 min','120':'2 min','180':'3 min'}[v.s2||'60'];
+        var stratLbl={libre:'Libre',tactica:'Táctica'}[v.s3||'libre'];
+        return modeLbl+', '+timeLbl+', '+stratLbl;
+      }
+      return modeLbl+', '+(v.s2||'10');
+    },
+    buildMatch:function(v){
+      var isCombat=(v.s1==='cmb'||v.s1==='champ');
+      if(isCombat) return { s1:v.s1, s2:String(v.s2||'60'), s3:(v.s3||'libre') };
+      return { s1:v.s1||'def', s2:String(v.s2||'10'), s3:'paus' };
+    },
+    constrain:function(v){
+      var isCombat=(v.s1==='cmb'||v.s1==='champ');
+      if(isCombat){
+        if(v.s2!=='60'&&v.s2!=='120'&&v.s2!=='180') v.s2='60';
+        if(v.s3!=='libre'&&v.s3!=='tactica') v.s3='libre';
+      } else {
+        if(v.s2!=='10'&&v.s2!=='25'&&v.s2!=='50') v.s2='10';
+        v.s3='paus';
+      }
+    },
+    disabledDim:function(v, key){ return key==='s3' && !(v.s1==='cmb'||v.s1==='champ'); },
+    disabledOption:function(v, key, val){
+      if(key!=='s2') return false;
+      var isCombat=(v.s1==='cmb'||v.s1==='champ');
+      return isCombat ? (val==='10'||val==='25'||val==='50') : (val==='60'||val==='120'||val==='180');
+    } }
 ];
 function adapterOf(slug){ return APP_ADAPTERS.filter(function(a){ return a.slug===slug; })[0]||null; }
 /* Mejor marca de cada persona (por nombre exacto, tal como lo escribio
@@ -723,12 +952,21 @@ function fmtVal(val, adapter){
   return String(val);
 }
 /* Resuelve la coleccion/filtro reales de una prueba: si la app tiene
-   "dims" (de momento solo Velocidad de Reaccion) y la prueba trae
-   dimValues, se construye la coleccion a medida (buildCollection); si no,
-   se usa el combo oficial de siempre (adapter.collection/match). */
+   "dims" y la prueba trae dimValues, se usa el combo elegido -- ya sea
+   construyendo una coleccion a medida (buildCollection, solo Velocidad de
+   Reaccion, que reparte el ranking en una coleccion por combinacion) o
+   filtrando con where() la coleccion unica de la app (buildMatch, el
+   resto -- mismo patron que adapter.match de siempre pero con los valores
+   que eligio el admin en vez de los oficiales). Si no hay dims o no se
+   eligio nada, se usa el combo oficial de siempre (adapter.collection/match). */
 function resolveEntryQuery(adapter, entry){
   if(adapter.dims && entry.dimValues){
-    return { collection:adapter.buildCollection(entry.dimValues), match:null,
+    if(adapter.buildCollection){
+      return { collection:adapter.buildCollection(entry.dimValues), match:null,
+                label:adapter.name+' ('+adapter.dimLabel(entry.dimValues)+')' };
+    }
+    var m = adapter.buildMatch ? adapter.buildMatch(entry.dimValues) : entry.dimValues;
+    return { collection:adapter.collection, match:m,
               label:adapter.name+' ('+adapter.dimLabel(entry.dimValues)+')' };
   }
   return { collection:adapter.collection, match:adapter.match, label:adapter.name };
