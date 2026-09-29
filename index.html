@@ -133,14 +133,15 @@ if('serviceWorker' in navigator){
 
   /* ---------- Clasificacion ---------- */
   .clasif-list{display:flex;flex-direction:column;gap:6px;}
-  .clasif-row{display:flex;align-items:center;gap:10px;border:2px solid var(--borde);border-radius:8px;padding:8px 10px;}
-  .clasif-pos{flex:none;width:26px;height:26px;border-radius:50%;background:#eee;color:#555;font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center;}
+  .clasif-row{display:flex;align-items:center;gap:10px;border:2px solid var(--borde);border-radius:8px;padding:8px 10px;cursor:pointer;}
+  .clasif-pos{flex:none;width:26px;height:26px;border-radius:50%;background:#000;color:#fff;font-weight:900;font-size:13px;display:flex;align-items:center;justify-content:center;}
   .clasif-pos.gold{background:#f4cf5f;color:#7a5c00;}
   .clasif-pos.silver{background:#d9d9d9;color:#555;}
   .clasif-pos.bronze{background:#e2b184;color:#6b3d10;}
   .clasif-mid{flex:1;min-width:0;}
   .clasif-name{font-weight:800;font-size:13px;letter-spacing:0.02em;color:var(--negro);}
-  .clasif-detalle{font-size:10px;color:#999;line-height:1.4;margin-top:2px;}
+  .clasif-detalle{display:none;font-size:10px;color:#999;line-height:1.4;margin-top:2px;}
+  .clasif-row.open .clasif-detalle{display:block;}
   .clasif-pts{flex:none;font-weight:900;font-size:17px;color:var(--rojo);min-width:26px;text-align:right;}
 
   /* ---------- Tabla de campeonato ---------- */
@@ -254,7 +255,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v15</div>
+    <div class="app-ver">v16</div>
   </footer>
 
 </div>
@@ -867,7 +868,7 @@ async function computeClasificacion(){
       var pts=pointsFor(idx);
       if(!totals[r.name]) totals[r.name]={ name:r.name, points:0, apps:[] };
       totals[r.name].points += pts;
-      totals[r.name].apps.push({ app:cfg.name, pos:idx+1, pts:pts });
+      totals[r.name].apps.push({ app:cfg.name, pos:idx+1, pts:pts, val:r.val, unidad:cfg.unidad });
     });
   });
   var list=Object.keys(totals).map(function(k){ return totals[k]; });
@@ -891,12 +892,22 @@ async function renderClasificacion(){
 }
 function paintClasificacion(list){
   var host=$('clasifBody');
+  if(!host.dataset.clasifBound){
+    host.dataset.clasifBound='1';
+    /* Delegado en el contenedor (persiste entre re-renders de innerHTML,
+       a diferencia de listeners puestos fila por fila): pulsar un cuadro
+       muestra app/puesto/resultado, volver a pulsar lo oculta. */
+    host.addEventListener('click', function(e){
+      var row=e.target.closest('.clasif-row');
+      if(row) row.classList.toggle('open');
+    });
+  }
   if(!list.length){ host.innerHTML='<div class="hint">Todavía no hay marcas guardadas en los rankings oficiales.</div>'; return; }
   var html='<div class="clasif-list">';
   var me=getMe();
   list.forEach(function(row, idx){
     var medal = idx===0?' gold':(idx===1?' silver':(idx===2?' bronze':''));
-    var detalle = row.apps.map(function(a){ return esc(a.app)+' ('+a.pos+'º, +'+a.pts+')'; }).join(' · ');
+    var detalle = row.apps.map(function(a){ return esc(a.app)+': '+a.pos+'º, '+fmtVal(a.val,{unidad:a.unidad}); }).join(' · ');
     html += '<div class="clasif-row'+(me && row.name===me?' is-me':'')+'">'
       + '<div class="clasif-pos'+medal+'">'+(idx+1)+'</div>'
       + '<div class="clasif-mid"><div class="clasif-name">'+esc(row.name)+'</div><div class="clasif-detalle">'+detalle+'</div></div>'
