@@ -252,7 +252,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v25</div>
+    <div class="app-ver">v26</div>
   </footer>
 
 </div>
@@ -678,6 +678,8 @@ var APP_ADAPTERS=[
     disabledDim:function(v, key){ return key==='total' && v.mode==='limite'; } },
   { slug:'rds-reaction-test', name:'Velocidad de Reacción',
     collection:'scores_reaction_10_normal_press_sound', match:null,
+    /* Clasificacion (2026-09-30, pedido expreso): Normal, 10, Bajar, SIN sonido. Solo la Clasificacion lo usa; Campeonatos siguen con 'collection'. */
+    clasifCollection:'scores_reaction_10_normal_press_nosound',
     metric:'avg', better:'lower', unidad:'ms', inClasif:true,
     /* Permite elegir un combo DISTINTO al oficial en Campeonatos (pedido
        expreso, 2026-09-28 -- "Go/NoGo, 15, subir").
@@ -927,8 +929,9 @@ var CLASIF_LOCAL_KEY={
   'rds-circuit-test':function(m){ return 'rds_circ_'+m.s1+'_'+m.s2+'_'+m.s3; },
   'rds-reactiontrial-test':function(m){ return 'rds_rtrial_'+m.s1+'_'+m.s2+'_'+m.s3; },
   'rds-memorycards-test':function(m){ return 'rds_mc_'+m.modo; },
-  'rds-reaction-test':function(m,cfg){ return 'rds_rank_'+cfg.collection.replace('scores_reaction_',''); }
+  'rds-reaction-test':function(m,cfg){ return 'rds_rank_'+clasifCol(cfg).replace('scores_reaction_',''); }
 };
+function clasifCol(cfg){ return cfg.clasifCollection||cfg.collection; }
 function clasifLocalDocs(cfg){
   var f=CLASIF_LOCAL_KEY[cfg.slug]; if(!f) return [];
   try{ var v=JSON.parse(localStorage.getItem(f(cfg.match||{},cfg))||'[]'); return Array.isArray(v)?v:[]; }catch(e){ return []; }
@@ -942,11 +945,11 @@ function clasifMerge(cfg,docs,local){
   docs.concat(local).forEach(function(d){ var k=clasifDocKey(cfg,d); if(!seen[k]){ seen[k]=1; out.push(d); } });
   return out;
 }
-function clasifSaveCache(slug,docs){
+function clasifSaveCache(slug,docs,col){
   var slim=docs.map(function(d){ var c={}; for(var k in d){ if(k!=='path') c[k]=d[k]; } return c; });   // path (Circuit) es enorme y no se usa
-  try{ localStorage.setItem(CLASIF_CACHE_PREFIX+slug, JSON.stringify({ts:Date.now(), docs:slim})); }catch(e){}
+  try{ localStorage.setItem(CLASIF_CACHE_PREFIX+slug, JSON.stringify({ts:Date.now(), col:col, docs:slim})); }catch(e){}
 }
-function clasifLoadCache(slug){ try{ return JSON.parse(localStorage.getItem(CLASIF_CACHE_PREFIX+slug)||'null'); }catch(e){ return null; } }
+function clasifLoadCache(slug,col){ try{ var c=JSON.parse(localStorage.getItem(CLASIF_CACHE_PREFIX+slug)||'null'); return (c && c.col===col) ? c : null; }catch(e){ return null; } }
 async function computeClasificacion(){
   var totals={};
   var lista=APP_ADAPTERS.filter(function(a){ return a.inClasif; });
@@ -956,14 +959,14 @@ async function computeClasificacion(){
      en vez de sumarse por cada app. Sin red ni se intenta (respuesta al momento). */
   var results=await Promise.all(lista.map(function(cfg){
     if(!online) return null;
-    return withTimeout(window.hubFetchRanking(cfg.collection, cfg.match), FETCH_TIMEOUT_MS);
+    return withTimeout(window.hubFetchRanking(clasifCol(cfg), cfg.match), FETCH_TIMEOUT_MS);
   }));
   var meta={ offline:!online, stale:0, ts:0 };
   lista.forEach(function(cfg, i){
     var docs=results[i];
-    if(docs){ clasifSaveCache(cfg.slug, docs); }
+    if(docs){ clasifSaveCache(cfg.slug, docs, clasifCol(cfg)); }
     else {
-      var c=clasifLoadCache(cfg.slug);
+      var c=clasifLoadCache(cfg.slug, clasifCol(cfg));
       if(c && c.docs){ docs=c.docs; meta.stale++; meta.ts = meta.ts ? Math.min(meta.ts,c.ts) : c.ts; }
       else { docs=[]; meta.stale++; }
     }
