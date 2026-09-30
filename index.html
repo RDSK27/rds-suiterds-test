@@ -96,7 +96,7 @@ if('serviceWorker' in navigator){
 
   /* ---------- Rankings: rejilla de apps ---------- */
   .app-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
-  .app-btn{ display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 4px;background:#fff;border:2px solid var(--borde);border-radius:10px;cursor:pointer;text-align:center; }
+  .app-btn{ text-decoration:none;display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 4px;background:#fff;border:2px solid var(--borde);border-radius:10px;cursor:pointer;text-align:center; }
   .app-btn:active{transform:translateY(2px);}
   .app-btn img{width:44px;height:44px;border-radius:9px;object-fit:cover;}
   .app-btn span{font-size:10.5px;font-weight:700;letter-spacing:0.02em;color:var(--negro);line-height:1.25;}
@@ -255,7 +255,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v23</div>
+    <div class="app-ver">v24</div>
   </footer>
 
 </div>
@@ -403,18 +403,18 @@ function $(id){ return document.getElementById(id); }
    Firestore y fusionarla con esta lista, para poder dar de alta apps
    nuevas desde el panel de admin sin tocar este archivo. */
 var APPS=[
+  { slug:'rds-reaction-test',         name:'Reaction', icon:'icons/rds-reaction-test.png' },
+  { slug:'rds-processing-test',       name:'Processing',        icon:'icons/rds-processing-test.png' },
+  { slug:'rds-perception-test',       name:'Perception',        icon:'icons/rds-perception-test.png' },
   { slug:'rds-ballcoordination-test', name:'Ball Coordination', icon:'icons/rds-ballcoordination-test.png' },
   { slug:'rds-lightsreaction-test',   name:'Lights Speed',      icon:'icons/rds-lightsreaction-test.png' },
-  { slug:'rds-perception-test',       name:'Perception',        icon:'icons/rds-perception-test.png' },
-  { slug:'rds-processing-test',       name:'Processing',        icon:'icons/rds-processing-test.png' },
-  { slug:'rds-rallymemory-test',      name:'Rally Memory',      icon:'icons/rds-rallymemory-test.png' },
-  { slug:'rds-reaction-test',         name:'Velocidad de Reacci&#243;n', icon:'icons/rds-reaction-test.png' },
-  { slug:'rds-reactiontenis-test',    name:'Reaction Tenis',    icon:'icons/rds-reactiontenis-test.png' },
-  { slug:'rds-circuit-test',          name:'Circuit Reaction',  icon:'icons/rds-circuit-test.png' },
-  { slug:'rds-gimnasia-test',         name:'Gimnasia',          icon:'icons/rds-gimnasia-test.png' },
   { slug:'rds-memorycards-test',      name:'Memory Cards',      icon:'icons/rds-memorycards-test.png' },
+  { slug:'rds-reactiontrial-test',    name:'Reaction Trial',    icon:'icons/rds-reactiontrial-test.png' },
+  { slug:'rds-circuit-test',          name:'Circuit Reaction',  icon:'icons/rds-circuit-test.png' },
+  { slug:'rds-reactiontenis-test',    name:'Reaction Tenis',    icon:'icons/rds-reactiontenis-test.png' },
   { slug:'rds-reactionkarate-test',   name:'Reaction Karate',   icon:'icons/rds-reactionkarate-test.png' },
-  { slug:'rds-reactiontrial-test',    name:'Reaction Trial',    icon:'icons/rds-reactiontrial-test.png' }
+  { slug:'rds-rallymemory-test',      name:'Rally Memory',      icon:'icons/rds-rallymemory-test.png' },
+  { slug:'rds-gimnasia-test',         name:'Gimnasia',          icon:'icons/rds-gimnasia-test.png' }
 ];
 /* Si ya me he marcado ("quien soy"), se pasa por la URL al abrir la app --
    cada una de las 12 sabe leer ?ini=&dep= (2026-09-28) y se autorrellena/
