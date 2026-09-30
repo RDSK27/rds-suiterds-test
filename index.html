@@ -140,7 +140,9 @@ if('serviceWorker' in navigator){
   .clasif-pos.bronze{background:#e2b184;color:#6b3d10;}
   .clasif-mid{flex:1;min-width:0;}
   .clasif-name{font-weight:800;font-size:13px;letter-spacing:0.02em;color:var(--negro);}
-  .clasif-detalle{display:none;font-size:10px;color:#999;line-height:1.4;margin-top:2px;}
+  .clasif-detalle{display:none;font-size:11px;color:#666;line-height:1.5;margin-top:4px;}
+  .clasif-det-line{display:flex;justify-content:space-between;gap:10px;}
+  .clasif-det-line span:last-child{font-weight:700;color:#444;white-space:nowrap;}
   .clasif-row.open .clasif-detalle{display:block;}
   .clasif-pts{flex:none;font-weight:900;font-size:17px;color:var(--rojo);min-width:26px;text-align:right;}
 
@@ -233,11 +235,6 @@ if('serviceWorker' in navigator){
     <!-- ================= CLASIFICACION ================= -->
     <section class="panel" id="panel-clasificacion">
       <div class="section-title">Clasificaci&#243;n general</div>
-      <div class="hint" style="padding-top:0;padding-bottom:10px;">
-        Puntos estilo Mundial de MotoGP (25 al 1&#186;, 20 al 2&#186;, 16 al 3&#186;...
-        hasta 1 al 15&#186;) en el ranking oficial (el marcado por defecto al entrar)
-        de cada app, sumados por persona.
-      </div>
       <div id="clasifBody"></div>
     </section>
 
@@ -255,7 +252,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v24</div>
+    <div class="app-ver">v25</div>
   </footer>
 
 </div>
@@ -912,18 +909,65 @@ function withTimeout(promise, ms){
     new Promise(function(resolve){ setTimeout(function(){ resolve(null); }, ms); })
   ]);
 }
+/* Clasificacion sin conexion (2026-09-30): cada vez que se calcula con red se
+   guarda lo leido de cada app (suiterds_clasif_cache_<slug>). Sin red, o si una
+   lectura falla, se usa esa copia. Y a lo leido (o copiado) se le SUMAN las
+   marcas guardadas en ESTE dispositivo por cada app para ese mismo ranking
+   (incluidas las aun pendientes de subir): asi, si offline se puntua en una
+   app, la clasificacion cambia al momento en este movil. Ojo: solo ve esas
+   marcas si SuiteRDS y la app comparten localStorage (mismo navegador; en iOS
+   cada icono instalado por separado tiene el suyo aislado). Al volver la red,
+   las marcas suben y el recalculo las incluye (dedupe por contenido). */
+var CLASIF_CACHE_PREFIX='suiterds_clasif_cache_';
+var CLASIF_LOCAL_KEY={
+  'rds-ballcoordination-test':function(m){ return m.mode==='limite' ? 'coord1_lb_limite' : 'coord1_lb_'+m.mode+'_'+m.count+(m.penaliza?'_p1':'_p0'); },
+  'rds-lightsreaction-test':function(m){ return 'rds_lst_'+m.mode+'_'+m.stim+'_'+m.total; },
+  'rds-perception-test':function(m){ return 'rds_pst_'+m.mode+'_'+m.stim+'_'+m.total; },
+  'rds-processing-test':function(m){ return 'rds_prst_'+m.mode+'_'+m.stim+'_'+m.total; },
+  'rds-circuit-test':function(m){ return 'rds_circ_'+m.s1+'_'+m.s2+'_'+m.s3; },
+  'rds-reactiontrial-test':function(m){ return 'rds_rtrial_'+m.s1+'_'+m.s2+'_'+m.s3; },
+  'rds-memorycards-test':function(m){ return 'rds_mc_'+m.modo; },
+  'rds-reaction-test':function(m,cfg){ return 'rds_rank_'+cfg.collection.replace('scores_reaction_',''); }
+};
+function clasifLocalDocs(cfg){
+  var f=CLASIF_LOCAL_KEY[cfg.slug]; if(!f) return [];
+  try{ var v=JSON.parse(localStorage.getItem(f(cfg.match||{},cfg))||'[]'); return Array.isArray(v)?v:[]; }catch(e){ return []; }
+}
+function clasifDocKey(cfg,d){
+  if(cfg.slug==='rds-reaction-test') return (d.name||'')+'|'+d.avg+'|'+(d.date||'');   // sus marcas locales no llevan ts
+  return (d.name||'')+'|'+(d.ts||d.date||'')+'|'+d[cfg.metric];
+}
+function clasifMerge(cfg,docs,local){
+  var seen={}, out=[];
+  docs.concat(local).forEach(function(d){ var k=clasifDocKey(cfg,d); if(!seen[k]){ seen[k]=1; out.push(d); } });
+  return out;
+}
+function clasifSaveCache(slug,docs){
+  var slim=docs.map(function(d){ var c={}; for(var k in d){ if(k!=='path') c[k]=d[k]; } return c; });   // path (Circuit) es enorme y no se usa
+  try{ localStorage.setItem(CLASIF_CACHE_PREFIX+slug, JSON.stringify({ts:Date.now(), docs:slim})); }catch(e){}
+}
+function clasifLoadCache(slug){ try{ return JSON.parse(localStorage.getItem(CLASIF_CACHE_PREFIX+slug)||'null'); }catch(e){ return null; } }
 async function computeClasificacion(){
   var totals={};
   var lista=APP_ADAPTERS.filter(function(a){ return a.inClasif; });
+  var online=navigator.onLine;
   /* En paralelo (no una app detras de otra): si alguna tarda o se atasca,
      no alarga la espera de las demas, y el limite total es ~FETCH_TIMEOUT_MS
-     en vez de sumarse por cada app. */
+     en vez de sumarse por cada app. Sin red ni se intenta (respuesta al momento). */
   var results=await Promise.all(lista.map(function(cfg){
+    if(!online) return null;
     return withTimeout(window.hubFetchRanking(cfg.collection, cfg.match), FETCH_TIMEOUT_MS);
   }));
+  var meta={ offline:!online, stale:0, ts:0 };
   lista.forEach(function(cfg, i){
     var docs=results[i];
-    if(!docs) return;   // fallo o timeout en esa app -- se omite, no rompe el resto
+    if(docs){ clasifSaveCache(cfg.slug, docs); }
+    else {
+      var c=clasifLoadCache(cfg.slug);
+      if(c && c.docs){ docs=c.docs; meta.stale++; meta.ts = meta.ts ? Math.min(meta.ts,c.ts) : c.ts; }
+      else { docs=[]; meta.stale++; }
+    }
+    docs=clasifMerge(cfg, docs, clasifLocalDocs(cfg));
     var ranked=dedupeBest(docs, cfg.metric, cfg.better);
     ranked.slice(0,MOTOGP_POINTS.length).forEach(function(r, idx){
       var pts=pointsFor(idx);
@@ -934,24 +978,32 @@ async function computeClasificacion(){
   });
   var list=Object.keys(totals).map(function(k){ return totals[k]; });
   list.sort(function(a,b){ return b.points-a.points; });
-  return list;
+  return { list:list, meta:meta };
 }
-/* Se recalcula siempre desde cero (pedido expreso, 2026-09-28: "que se
-   actualice al entrar en la pestaña") -- sin cache. Igual que Rankings y
-   la tabla de cada Campeonato, que ya eran siempre al momento; antes
-   Clasificacion era la unica que se quedaba con lo primero que habia
-   calculado en la sesion hasta pulsar "Actualizar" a mano. */
+function clasifNoteHtml(meta){
+  if(!meta || (!meta.offline && !meta.stale)) return '';
+  var d=meta.ts?new Date(meta.ts):null;
+  var when=d ? (' (actualizados el '+two2(d.getDate())+'/'+two2(d.getMonth()+1)+' a las '+two2(d.getHours())+':'+two2(d.getMinutes())+')') : '';
+  var txt = meta.offline
+    ? 'Sin conexi\u00f3n: clasificaci\u00f3n con los \u00faltimos datos guardados en este dispositivo'+when+' y tus marcas locales.'
+    : 'No se pudieron actualizar '+meta.stale+(meta.stale===1?' prueba':' pruebas')+': se usan los \u00faltimos datos guardados'+when+'.';
+  return '<div class="hint" style="padding:0 0 10px;text-align:left;">'+txt+'</div>';
+}
+function two2(n){ return (n<10?'0':'')+n; }
+/* Se recalcula siempre al entrar en la pestana (pedido expreso, 2026-09-28: "que se
+   actualice al entrar en la pestana"); la copia guardada solo se usa si no hay red
+   o falla la lectura. */
 async function renderClasificacion(){
   var host=$('clasifBody');
-  host.innerHTML='<div class="hint">Calculando…</div>';
+  if(navigator.onLine) host.innerHTML='<div class="hint">Calculando\u2026</div>';
   try{
-    var list=await computeClasificacion();
-    paintClasificacion(list);
+    var res=await computeClasificacion();
+    paintClasificacion(res.list, res.meta);
   }catch(e){
-    host.innerHTML='<div class="hint">No se pudo calcular la clasificación. Comprueba la conexión.</div>';
+    host.innerHTML='<div class="hint">No se pudo calcular la clasificaci\u00f3n. Comprueba la conexi\u00f3n.</div>';
   }
 }
-function paintClasificacion(list){
+function paintClasificacion(list, meta){
   var host=$('clasifBody');
   if(!host.dataset.clasifBound){
     host.dataset.clasifBound='1';
@@ -963,12 +1015,12 @@ function paintClasificacion(list){
       if(row) row.classList.toggle('open');
     });
   }
-  if(!list.length){ host.innerHTML='<div class="hint">Todavía no hay marcas guardadas en los rankings oficiales.</div>'; return; }
-  var html='<div class="clasif-list">';
+  if(!list.length){ host.innerHTML=clasifNoteHtml(meta)+'<div class="hint">'+(meta&&meta.offline?'Sin conexi\u00f3n y sin datos guardados todav\u00eda: abre la clasificaci\u00f3n con conexi\u00f3n al menos una vez.':'Todav\u00eda no hay marcas guardadas en los rankings oficiales.')+'</div>'; return; }
+  var html=clasifNoteHtml(meta)+'<div class="clasif-list">';
   var me=getMe();
   list.forEach(function(row, idx){
     var medal = idx===0?' gold':(idx===1?' silver':(idx===2?' bronze':''));
-    var detalle = row.apps.map(function(a){ return esc(a.app)+': '+a.pos+'º, '+fmtVal(a.val,{unidad:a.unidad}); }).join(' · ');
+    var detalle = row.apps.map(function(a){ return '<div class="clasif-det-line"><span>'+esc(a.app)+'</span><span>'+fmtVal(a.val,{unidad:a.unidad})+'</span></div>'; }).join('');
     html += '<div class="clasif-row'+(me && row.name===me?' is-me':'')+'">'
       + '<div class="clasif-pos'+medal+'">'+(idx+1)+'</div>'
       + '<div class="clasif-mid"><div class="clasif-name">'+esc(row.name)+'</div><div class="clasif-detalle">'+detalle+'</div></div>'
