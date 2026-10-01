@@ -142,8 +142,9 @@ if('serviceWorker' in navigator){
   .clasif-mid{flex:1;min-width:0;}
   .clasif-name{font-weight:800;font-size:13px;letter-spacing:0.02em;color:var(--negro);}
   .clasif-detalle{display:none;font-size:11px;color:#666;line-height:1.5;margin-top:4px;}
-  .clasif-det-line{display:flex;justify-content:space-between;gap:10px;}
-  .clasif-det-line span:last-child{font-weight:700;color:#444;white-space:nowrap;}
+  .clasif-det-line{display:flex;gap:10px;min-height:1.5em;}
+  .cdl-app{flex:0 0 48%;min-width:0;}
+  .cdl-res{flex:1;font-weight:700;color:#444;white-space:nowrap;font-variant-numeric:tabular-nums;}
   .clasif-row.open .clasif-detalle{display:block;}
   .clasif-pts{flex:none;font-weight:900;font-size:17px;color:var(--rojo);min-width:26px;text-align:right;}
 
@@ -218,7 +219,7 @@ if('serviceWorker' in navigator){
   <div class="logo-wrap"><img src="logo.png" alt="RDS"></div>
 
   <div class="tabs" id="tabs">
-    <button class="sel" data-tab="rankings">Rankings</button>
+    <button class="sel" data-tab="rankings">Apps</button>
     <button data-tab="clasificacion">Clasificaci&#243;n</button>
     <button data-tab="campeonatos">Campeonatos</button>
   </div>
@@ -255,7 +256,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v30</div>
+    <div class="app-ver">v31</div>
   </footer>
 
 </div>
@@ -563,22 +564,17 @@ function setMe(ini, dep){
   renderMeBar();
   renderAppGrid(); try{ renderPendBanner(); }catch(e){}   // los botones de Rankings ya llevan la identidad nueva en la URL
 }
-function renderMeBar(){
-  var host=$('meBar'), me=getMe();
-  if(me){
-    host.innerHTML='<div class="me-set">T&uacute; eres <b>'+esc(me)+'</b><button id="btnMeChange">Cambiar</button></div>';
-    $('btnMeChange').addEventListener('click', renderMeForm);
-  } else {
-    renderMeForm();
-  }
-}
+/* 2026-10-01: sin el texto "Tu eres" -- INI y deporte siempre visibles (con los valores
+   actuales) y editables; el boton guarda ("Marcarme" la primera vez, "Cambiar" despues). */
+function renderMeBar(){ renderMeForm(); }
 function renderMeForm(){
-  var host=$('meBar');
-  var opts=SPORT_OPTIONS.map(function(o){ return '<option value="'+o[0]+'"'+(o[0]==='OTR'?' selected':'')+'>'+o[1]+'</option>'; }).join('');
+  var host=$('meBar'), me=getMe();
+  var parts=me ? me.split('-') : [], curIni=parts[0]||'', curDep=parts.slice(1).join('-')||'OTR';
+  var opts=SPORT_OPTIONS.map(function(o){ return '<option value="'+o[0]+'"'+(o[0]===curDep?' selected':'')+'>'+o[1]+'</option>'; }).join('');
   host.innerHTML='<div class="me-form">'
-    +'<input type="text" id="meIniInput" placeholder="INI" maxlength="3" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false">'
+    +'<input type="text" id="meIniInput" placeholder="INI" maxlength="3" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" value="'+esc(curIni)+'">'
     +'<select id="meDepSelect">'+opts+'</select>'
-    +'<button id="btnMeSave">Marcarme</button>'
+    +'<button id="btnMeSave">'+(me?'Cambiar':'Marcarme')+'</button>'
     +'</div>';
   $('meIniInput').addEventListener('input', function(){ this.value=this.value.replace(/[^A-Za-z]/g,'').toUpperCase(); });
   $('btnMeSave').addEventListener('click', function(){
@@ -1021,7 +1017,7 @@ function clasifSaveCache(slug,docs,col){
 }
 function clasifLoadCache(slug,col){ try{ var c=JSON.parse(localStorage.getItem(CLASIF_CACHE_PREFIX+slug)||'null'); return (c && c.col===col) ? c : null; }catch(e){ return null; } }
 async function computeClasificacion(liveDocs){
-  var totals={};
+  var totals={}, det={};
   var lista=APP_ADAPTERS.filter(function(a){ return a.inClasif; });
   var online=navigator.onLine;
   /* En paralelo (no una app detras de otra): si alguna tarda o se atasca,
@@ -1045,6 +1041,9 @@ async function computeClasificacion(liveDocs){
     docs=clasifMerge(cfg, docs, clasifLocalDocs(cfg));
     if(cfg.clasifFilter) docs=docs.filter(cfg.clasifFilter);
     var ranked=dedupeBest(docs, cfg.clasifMetric||cfg.metric, cfg.better);
+    ranked.forEach(function(r, idx){   // posicion real de cada persona en esta tabla (aunque no puntue)
+      (det[r.name]||(det[r.name]={}))[cfg.slug]={ pos:idx+1, val:r.val, doc:r.doc, unidad:cfg.unidad, fmt:cfg.clasifFmt };
+    });
     ranked.slice(0,MOTOGP_POINTS.length).forEach(function(r, idx){
       var pts=pointsFor(idx);
       if(!totals[r.name]) totals[r.name]={ name:r.name, points:0, apps:[] };
@@ -1052,7 +1051,7 @@ async function computeClasificacion(liveDocs){
       totals[r.name].apps.push({ app:cfg.name, pos:idx+1, pts:pts, val:r.val, unidad:cfg.unidad, doc:r.doc, fmt:cfg.clasifFmt });
     });
   });
-  var list=Object.keys(totals).map(function(k){ return totals[k]; });
+  var list=Object.keys(totals).map(function(k){ var tt=totals[k]; tt.det=det[k]||{}; return tt; });
   list.sort(function(a,b){ return b.points-a.points; });
   return { list:list, meta:meta };
 }
@@ -1125,6 +1124,18 @@ document.addEventListener('visibilitychange', function(){
   else if(panel && panel.classList.contains('active')){ renderClasificacion(); }
 });
 window.addEventListener('online', function(){ var panel=$('panel-clasificacion'); if(panel && panel.classList.contains('active')) renderClasificacion(); });
+/* Desplegable de cada persona (2026-10-01): una linea por app en el orden de la suite
+   (Reaction, Processing, ...), con el nombre de la app y, en una segunda columna alineada,
+   "posicion- resultado" (posicion con 2 cifras). Sin resultado: solo el nombre de la app. */
+function pad2p(n){ return n<10 ? '0'+n : String(n); }
+function clasifDetalleHtml(row){
+  var det=row.det||{};
+  return APPS.filter(function(a){ return APP_ADAPTERS.some(function(c){ return c.slug===a.slug && c.inClasif; }); }).map(function(a){
+    var d=det[a.slug];
+    var res = d ? (pad2p(d.pos)+'- '+(d.fmt ? d.fmt(d.doc) : fmtVal(d.val,{unidad:d.unidad}))) : '';
+    return '<div class="clasif-det-line"><span class="cdl-app">'+a.name+'</span><span class="cdl-res">'+res+'</span></div>';
+  }).join('');
+}
 function paintClasificacion(list, meta){
   var host=$('clasifBody');
   var openNames={}; Array.prototype.forEach.call(host.querySelectorAll('.clasif-row.open .clasif-name'), function(n){ openNames[n.textContent]=1; });
@@ -1143,7 +1154,7 @@ function paintClasificacion(list, meta){
   var me=getMe();
   list.forEach(function(row, idx){
     var medal = idx===0?' gold':(idx===1?' silver':(idx===2?' bronze':''));
-    var detalle = row.apps.map(function(a){ return '<div class="clasif-det-line"><span>'+esc(a.app)+'</span><span>'+(a.fmt ? a.fmt(a.doc) : fmtVal(a.val,{unidad:a.unidad}))+'</span></div>'; }).join('');
+    var detalle = clasifDetalleHtml(row);
     html += '<div class="clasif-row'+(me && row.name===me?' is-me':'')+'">'
       + '<div class="clasif-pos'+medal+'">'+(idx+1)+'</div>'
       + '<div class="clasif-mid"><div class="clasif-name">'+esc(row.name)+'</div><div class="clasif-detalle">'+detalle+'</div></div>'
