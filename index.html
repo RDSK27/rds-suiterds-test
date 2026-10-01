@@ -116,7 +116,7 @@ if('serviceWorker' in navigator){
   table.champ-table tr.is-me td.champ-name-cell{color:var(--rojo);}
 
   /* ---------- Bloques comunes ---------- */
-  .hint{color:#888;font-size:12.5px;line-height:1.5;text-align:center;padding:18px 8px;}
+  $1$2  .pend-banner{display:none;color:#a5651a;background:#fff7e6;border:1px solid #f0d9a8;border-radius:8px;font-size:12px;line-height:1.5;padding:8px 10px;margin:0 0 10px;text-align:left;}
   .section-title{font-weight:900;letter-spacing:1px;text-transform:uppercase;font-size:13px;color:var(--rojo);margin:2px 0 10px;text-align:center;}
 
   /* ---------- Campeonatos ---------- */
@@ -229,12 +229,14 @@ if('serviceWorker' in navigator){
     <!-- ================= RANKINGS ================= -->
     <section class="panel active" id="panel-rankings">
       <div class="section-title">Ranking de cada app</div>
+      <div class="pend-banner" id="pendBannerR"></div>
       <div class="app-grid" id="appGrid"></div>
     </section>
 
     <!-- ================= CLASIFICACION ================= -->
     <section class="panel" id="panel-clasificacion">
-      <div class="section-title">Clasificaci&#243;n general</div>
+      $1
+      <div class="pend-banner" id="pendBannerC"></div>
       <div id="clasifBody"></div>
     </section>
 
@@ -252,7 +254,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v26</div>
+    <div class="app-ver">v27</div>
   </footer>
 
 </div>
@@ -260,7 +262,7 @@ if('serviceWorker' in navigator){
 <!-- Firebase (mismo proyecto compartido que el resto de la suite) -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
-import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, getDoc, getDocs, query, where } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, getDoc, getDocs, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 const firebaseConfig = {
   apiKey: "AIzaSyBbEgbWddPt_rhPM24bL_Nacp7TAlh1biM",
   authDomain: "rds-reaction-test.firebaseapp.com",
@@ -378,6 +380,21 @@ window.hubLoadChamps=async function(){
    suite, con hasta 3 filtros de igualdad (mismo patron where() que ya usa
    cada app para su propio ranking -- los indices compuestos que hacen
    falta ya existen, porque son la MISMA consulta que la app original). */
+/* Version en directo de hubFetchRanking (2026-10-01): onSnapshot sobre la misma
+   consulta. Ignora las respuestas fromCache (sin servidor no hay datos reales); con includeMetadataChanges llega tambien el paso cache->servidor aunque los datos no cambien. */
+window.hubWatchRanking=function(collName, matchObj, cb){
+  if(!db) return null;
+  try{
+    var constraints=[];
+    if(matchObj){ for(var k in matchObj){ constraints.push(where(k, '==', matchObj[k])); } }
+    var q = constraints.length ? query(collection(db,collName), ...constraints) : collection(db,collName);
+    return onSnapshot(q, { includeMetadataChanges:true }, function(snap){
+      if(snap.metadata.fromCache) return;
+      var out=[]; snap.forEach(function(d){ out.push(d.data()); });
+      cb(out);
+    }, function(){});
+  }catch(e){ return null; }
+};
 window.hubFetchRanking=async function(collName, matchObj){
   if(!db) return [];
   try{
@@ -428,7 +445,31 @@ function appUrl(slug){
 }
 
 /* ---------- Pestanas ---------- */
-function showTab(id){
+/* Marcas sin subir (2026-10-01): cada app guarda sus marcas offline en su cola
+   (localStorage) y SOLO las sube cuando esa app esta abierta. Aqui se lee el
+   tamano de cada cola para avisar de que apps hay que abrir con conexion
+   (solo se ve si SuiteRDS y las apps comparten localStorage en este movil). */
+var PENDING_KEYS={
+  'rds-ballcoordination-test':'coord1_pending', 'rds-lightsreaction-test':'rds_lst_pending', 'rds-perception-test':'rds_pst_pending',
+  'rds-processing-test':'rds_prst_pending', 'rds-rallymemory-test':'rds_rallymemory_pending', 'rds-reaction-test':'rds_rank_pending',
+  'rds-reactiontenis-test':'rtenis_pending', 'rds-circuit-test':'rds_circ_pending', 'rds-gimnasia-test':'rds_gimnasia_pending',
+  'rds-memorycards-test':'rds_mc_pending', 'rds-reactionkarate-test':'rds_rkarate_pending', 'rds-reactiontrial-test':'rds_rtrial_pending'
+};
+function renderPendBanner(){
+  var parts=[], tot=0;
+  APPS.forEach(function(a){
+    var k=PENDING_KEYS[a.slug]; if(!k) return;
+    var n=0; try{ var v=JSON.parse(localStorage.getItem(k)||'[]'); n=Array.isArray(v)?v.length:0; }catch(e){}
+    if(n>0){ parts.push(a.name+' ('+n+')'); tot+=n; }
+  });
+  var html = tot ? ('\u26a0 '+tot+(tot===1?' marca sin subir':' marcas sin subir')+' en este dispositivo: '+parts.join(', ')+'. Abre esas apps con conexi\u00f3n para que se suban.') : '';
+  ['pendBannerR','pendBannerC'].forEach(function(id){ var el=$(id); if(!el) return; el.style.display=html?'block':'none'; el.textContent=html; });
+}
+window.addEventListener('storage', renderPendBanner);
+window.addEventListener('online', renderPendBanner);
+document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='visible') renderPendBanner(); });
+setInterval(renderPendBanner, 5000);
+function showTab(id){ if(id!=='clasificacion' && typeof stopClasifWatch==='function') stopClasifWatch(); try{ renderPendBanner(); }catch(e){}
   document.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('active'); });
   document.querySelectorAll('#tabs button').forEach(function(b){ b.classList.toggle('sel', b.getAttribute('data-tab')===id); });
   $('panel-'+id).classList.add('active');
@@ -519,7 +560,7 @@ function setMe(ini, dep){
   var v=(ini||'').trim().toUpperCase().replace(/[^A-Z]/g,'').slice(0,3)+'-'+(dep||'OTR');
   try{ localStorage.setItem(ME_LS, v); }catch(e){}
   renderMeBar();
-  renderAppGrid();   // los botones de Rankings ya llevan la identidad nueva en la URL
+  renderAppGrid(); try{ renderPendBanner(); }catch(e){}   // los botones de Rankings ya llevan la identidad nueva en la URL
 }
 function renderMeBar(){
   var host=$('meBar'), me=getMe();
@@ -950,17 +991,19 @@ function clasifSaveCache(slug,docs,col){
   try{ localStorage.setItem(CLASIF_CACHE_PREFIX+slug, JSON.stringify({ts:Date.now(), col:col, docs:slim})); }catch(e){}
 }
 function clasifLoadCache(slug,col){ try{ var c=JSON.parse(localStorage.getItem(CLASIF_CACHE_PREFIX+slug)||'null'); return (c && c.col===col) ? c : null; }catch(e){ return null; } }
-async function computeClasificacion(){
+async function computeClasificacion(liveDocs){
   var totals={};
   var lista=APP_ADAPTERS.filter(function(a){ return a.inClasif; });
   var online=navigator.onLine;
   /* En paralelo (no una app detras de otra): si alguna tarda o se atasca,
      no alarga la espera de las demas, y el limite total es ~FETCH_TIMEOUT_MS
      en vez de sumarse por cada app. Sin red ni se intenta (respuesta al momento). */
-  var results=await Promise.all(lista.map(function(cfg){
-    if(!online) return null;
-    return withTimeout(window.hubFetchRanking(clasifCol(cfg), cfg.match), FETCH_TIMEOUT_MS);
-  }));
+  var results = liveDocs
+    ? lista.map(function(cfg){ return liveDocs[cfg.slug]||null; })
+    : await Promise.all(lista.map(function(cfg){
+        if(!online) return null;
+        return withTimeout(window.hubFetchRanking(clasifCol(cfg), cfg.match), FETCH_TIMEOUT_MS);
+      }));
   var meta={ offline:!online, stale:0, ts:0 };
   lista.forEach(function(cfg, i){
     var docs=results[i];
@@ -993,21 +1036,60 @@ function clasifNoteHtml(meta){
   return '<div class="hint" style="padding:0 0 10px;text-align:left;">'+txt+'</div>';
 }
 function two2(n){ return (n<10?'0':'')+n; }
-/* Se recalcula siempre al entrar en la pestana (pedido expreso, 2026-09-28: "que se
-   actualice al entrar en la pestana"); la copia guardada solo se usa si no hay red
-   o falla la lectura. */
+/* Clasificacion EN DIRECTO (2026-10-01): al entrar en la pestana (o pulsar
+   Actualizar) se abre una escucha onSnapshot por cada ranking oficial. La
+   primera lectura sustituye al getDocs de antes (mismas lecturas) y despues
+   solo llegan los cambios: si alguien sube una marca, la clasificacion se
+   repinta sola. Se corta al salir de la pestana o con la app en segundo plano.
+   Sin red se usa la copia guardada + marcas locales (computeClasificacion). */
+var clasifUnsubs=[], clasifLive={}, clasifPainted=false, clasifTimer=null, clasifFirstTo=null;
+function stopClasifWatch(){
+  clasifUnsubs.forEach(function(u){ try{ u(); }catch(e){} });
+  clasifUnsubs=[]; clasifLive={}; clasifPainted=false;
+  if(clasifTimer){ clearTimeout(clasifTimer); clasifTimer=null; }
+  if(clasifFirstTo){ clearTimeout(clasifFirstTo); clasifFirstTo=null; }
+}
+async function repaintClasificacion(){
+  try{ var res=await computeClasificacion(clasifLive); clasifPainted=true; paintClasificacion(res.list, res.meta); }
+  catch(e){ $('clasifBody').innerHTML='<div class="hint">No se pudo calcular la clasificaci\u00f3n. Comprueba la conexi\u00f3n.</div>'; }
+}
+function scheduleClasifRepaint(){
+  if(clasifTimer) clearTimeout(clasifTimer);
+  clasifTimer=setTimeout(function(){ clasifTimer=null; repaintClasificacion(); }, 400);
+}
 async function renderClasificacion(){
   var host=$('clasifBody');
-  if(navigator.onLine) host.innerHTML='<div class="hint">Calculando\u2026</div>';
-  try{
-    var res=await computeClasificacion();
-    paintClasificacion(res.list, res.meta);
-  }catch(e){
-    host.innerHTML='<div class="hint">No se pudo calcular la clasificaci\u00f3n. Comprueba la conexi\u00f3n.</div>';
+  stopClasifWatch();
+  if(!navigator.onLine || !window.hubWatchRanking){
+    try{ var res=await computeClasificacion(); paintClasificacion(res.list, res.meta); }
+    catch(e){ host.innerHTML='<div class="hint">No se pudo calcular la clasificaci\u00f3n. Comprueba la conexi\u00f3n.</div>'; }
+    return;
   }
+  host.innerHTML='<div class="hint">Calculando\u2026</div>';
+  var lista=APP_ADAPTERS.filter(function(a){ return a.inClasif; });
+  lista.forEach(function(cfg){
+    var u=window.hubWatchRanking(clasifCol(cfg), cfg.match, function(docs){
+      clasifLive[cfg.slug]=docs;
+      clasifSaveCache(cfg.slug, docs, clasifCol(cfg));
+      if(!clasifPainted){
+        if(Object.keys(clasifLive).length>=lista.length){ if(clasifFirstTo){ clearTimeout(clasifFirstTo); clasifFirstTo=null; } repaintClasificacion(); }
+      } else { scheduleClasifRepaint(); }
+    });
+    if(u) clasifUnsubs.push(u);
+  });
+  /* Si alguna app no responde, no esperar para siempre: tras FETCH_TIMEOUT_MS
+     se pinta con lo que haya (copia guardada para las que faltan). */
+  clasifFirstTo=setTimeout(function(){ clasifFirstTo=null; if(!clasifPainted) repaintClasificacion(); }, FETCH_TIMEOUT_MS);
 }
+document.addEventListener('visibilitychange', function(){
+  var panel=$('panel-clasificacion');
+  if(document.visibilityState==='hidden'){ stopClasifWatch(); }
+  else if(panel && panel.classList.contains('active')){ renderClasificacion(); }
+});
+window.addEventListener('online', function(){ var panel=$('panel-clasificacion'); if(panel && panel.classList.contains('active')) renderClasificacion(); });
 function paintClasificacion(list, meta){
   var host=$('clasifBody');
+  var openNames={}; Array.prototype.forEach.call(host.querySelectorAll('.clasif-row.open .clasif-name'), function(n){ openNames[n.textContent]=1; });
   if(!host.dataset.clasifBound){
     host.dataset.clasifBound='1';
     /* Delegado en el contenedor (persiste entre re-renders de innerHTML,
@@ -1032,6 +1114,7 @@ function paintClasificacion(list, meta){
   });
   html+='</div><button class="add-prueba" id="btnRefreshClasif" style="margin-top:14px;">Actualizar</button>';
   host.innerHTML=html;
+  Array.prototype.forEach.call(host.querySelectorAll('.clasif-row'), function(r){ var n=r.querySelector('.clasif-name'); if(n && openNames[n.textContent]) r.classList.add('open'); });
   $('btnRefreshClasif').addEventListener('click', renderClasificacion);
 }
 
