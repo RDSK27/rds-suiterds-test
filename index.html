@@ -254,7 +254,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v27</div>
+    <div class="app-ver">v28</div>
   </footer>
 
 </div>
@@ -609,6 +609,21 @@ renderMeBar();
    tiene seleccion por defecto; Tenis: selectores propios sin patron
    .segment) -- no se ha querido adivinar mal. Se pueden anadir el dia que
    haga falta de verdad, investigando cada una a fondo. */
+/* Puntuacion propia de Clasificacion para Tenis (Set) y Karate (Defensa) (2026-10-01):
+   replica el orden de SU ranking en la app. Menor = mejor. */
+function tenisSetGames(d){
+  var s=d.setScores && d.setScores[0]; if(!s) return [0,0];
+  return Array.isArray(s) ? [s[0]||0, s[1]||0] : [s.m||0, s.r||0];
+}
+/* Set: victorias primero; si gana, menos juegos concedidos; si pierde, mas juegos hechos; empate: reaccion. */
+function tenisSetScore(d){
+  var g=tenisSetGames(d), tie=(d.avgRT||0)/100000;
+  return d.won ? (g[1]+tie) : (100-g[0]+tie);
+}
+function tenisSetFmt(d){ var g=tenisSetGames(d); return g[0]+'-'+g[1]+' \u00b7 '+Math.round(d.avgRT||0)+' ms'; }
+/* Defensa: mas defensas primero (def), luego menor reaccion media. */
+function karateDefScore(d){ return -(d.def||0)*100000 + (d.avg!=null ? d.avg : 99999); }
+function karateDefFmt(d){ return (d.def||0)+'/'+(d.ensayos!=null ? d.ensayos : (d.def||0))+' \u00b7 '+Math.round(d.avg||0)+' ms'; }
 var APP_ADAPTERS=[
   { slug:'rds-ballcoordination-test', name:'Ball Coordination',
     collection:'scores_ballcoordination', match:{mode:'normal', count:15, penaliza:true},
@@ -841,7 +856,13 @@ var APP_ADAPTERS=[
     } },
   { slug:'rds-reactiontenis-test', name:'Reaction Tenis',
     collection:'scores_reactiontenis', match:{mode:'normal', disc:'tenis', count:0, penaliza:true},
-    metric:'avgRT', better:'lower', unidad:'ms', inClasif:false,
+    metric:'avgRT', better:'lower', unidad:'ms', inClasif:true,
+    /* Clasificacion (2026-10-01, pedido expreso): Set a 4, Azar, Tenis. Solo la Clasificacion usa estos campos clasif*;
+       Campeonatos siguen con match/metric. Se consulta por mode/count/penaliza y disc/matchMode se filtran en local
+       (las marcas antiguas pueden no traer esos campos: faltar = tenis / azar, igual que en la app). */
+    clasifMatch:{ mode:'extremo', count:4, penaliza:true },
+    clasifMetric:tenisSetScore, clasifFmt:tenisSetFmt,
+    clasifFilter:function(d){ return (d.disc==='padel'?'padel':'tenis')==='tenis' && (d.matchMode||'azar')==='azar'; },
     /* No estaba en Campeonatos hasta ahora. "count" (set a 4/6) solo
        importa en Set/Partido (en Juego/Infinito/Peloteo se guarda 0).
        "penaliza" siempre es true en esta app (no es una opcion). No se
@@ -869,7 +890,9 @@ var APP_ADAPTERS=[
     disabledDim:function(v, key){ return key==='count' && !(v.mode==='extremo'||v.mode==='limite'); } },
   { slug:'rds-reactionkarate-test', name:'Reaction Karate',
     collection:'scores_reactionkarate', match:{s1:'def', s2:'10', s3:'paus'},
-    metric:'avg', better:'lower', unidad:'ms', inClasif:false,
+    metric:'avg', better:'lower', unidad:'ms', inClasif:true,
+    /* Clasificacion (2026-10-01, pedido expreso): Defensa 10 (el match de arriba). Ordena como la app: defensas, luego reaccion. */
+    clasifMetric:karateDefScore, clasifFmt:karateDefFmt,
     /* No estaba en Campeonatos hasta ahora. Defensa/Ataque: s2=ensayos,
        s3 siempre "paus". Combate/Campeonato: s2=tiempo(60/120/180),
        s3=estrategia -- el "ensayos" del home no aplica ahi. Mismo truco
@@ -923,12 +946,12 @@ function adapterOf(slug){ return APP_ADAPTERS.filter(function(a){ return a.slug=
 function dedupeBest(docs, metric, better){
   var map={};
   docs.forEach(function(d){
-    var val=d[metric];
+    var val=(typeof metric==='function') ? metric(d) : d[metric];
     if(val==null || !isFinite(val)) return;
     var nm=(d.name||'').trim().toUpperCase(); if(!nm) return;
     var cur=map[nm];
     var isBetter = !cur || (better==='lower' ? val<cur.val : val>cur.val);
-    if(isBetter) map[nm]={name:nm, val:val};
+    if(isBetter) map[nm]={name:nm, val:val, doc:d};
   });
   var arr=Object.keys(map).map(function(k){ return map[k]; });
   arr.sort(function(a,b){ return better==='lower' ? a.val-b.val : b.val-a.val; });
@@ -970,16 +993,19 @@ var CLASIF_LOCAL_KEY={
   'rds-circuit-test':function(m){ return 'rds_circ_'+m.s1+'_'+m.s2+'_'+m.s3; },
   'rds-reactiontrial-test':function(m){ return 'rds_rtrial_'+m.s1+'_'+m.s2+'_'+m.s3; },
   'rds-memorycards-test':function(m){ return 'rds_mc_'+m.modo; },
-  'rds-reaction-test':function(m,cfg){ return 'rds_rank_'+clasifCol(cfg).replace('scores_reaction_',''); }
+  'rds-reaction-test':function(m,cfg){ return 'rds_rank_'+clasifCol(cfg).replace('scores_reaction_',''); },
+  'rds-reactiontenis-test':function(m){ return 'rtenis_lb_'+m.mode+'_'+m.count+(m.penaliza?'_p1':'_p0'); },
+  'rds-reactionkarate-test':function(m){ return 'rds_rkarate_'+m.s1+'_'+m.s2+'_'+m.s3; }
 };
 function clasifCol(cfg){ return cfg.clasifCollection||cfg.collection; }
 function clasifLocalDocs(cfg){
   var f=CLASIF_LOCAL_KEY[cfg.slug]; if(!f) return [];
-  try{ var v=JSON.parse(localStorage.getItem(f(cfg.match||{},cfg))||'[]'); return Array.isArray(v)?v:[]; }catch(e){ return []; }
+  try{ var v=JSON.parse(localStorage.getItem(f(cfg.clasifMatch||cfg.match||{},cfg))||'[]'); return Array.isArray(v)?v:[]; }catch(e){ return []; }
 }
 function clasifDocKey(cfg,d){
   if(cfg.slug==='rds-reaction-test') return (d.name||'')+'|'+d.avg+'|'+(d.date||'');   // sus marcas locales no llevan ts
-  return (d.name||'')+'|'+(d.ts||d.date||'')+'|'+d[cfg.metric];
+  var mt=cfg.clasifMetric||cfg.metric;
+  return (d.name||'')+'|'+(d.ts||d.date||'')+'|'+((typeof mt==='function')?mt(d):d[mt]);
 }
 function clasifMerge(cfg,docs,local){
   var seen={}, out=[];
@@ -987,7 +1013,7 @@ function clasifMerge(cfg,docs,local){
   return out;
 }
 function clasifSaveCache(slug,docs,col){
-  var slim=docs.map(function(d){ var c={}; for(var k in d){ if(k!=='path') c[k]=d[k]; } return c; });   // path (Circuit) es enorme y no se usa
+  var slim=docs.map(function(d){ var c={}; for(var k in d){ if(k!=='path' && k!=='balls') c[k]=d[k]; } return c; });   // path (Circuit) es enorme y no se usa
   try{ localStorage.setItem(CLASIF_CACHE_PREFIX+slug, JSON.stringify({ts:Date.now(), col:col, docs:slim})); }catch(e){}
 }
 function clasifLoadCache(slug,col){ try{ var c=JSON.parse(localStorage.getItem(CLASIF_CACHE_PREFIX+slug)||'null'); return (c && c.col===col) ? c : null; }catch(e){ return null; } }
@@ -1002,7 +1028,7 @@ async function computeClasificacion(liveDocs){
     ? lista.map(function(cfg){ return liveDocs[cfg.slug]||null; })
     : await Promise.all(lista.map(function(cfg){
         if(!online) return null;
-        return withTimeout(window.hubFetchRanking(clasifCol(cfg), cfg.match), FETCH_TIMEOUT_MS);
+        return withTimeout(window.hubFetchRanking(clasifCol(cfg), cfg.clasifMatch||cfg.match), FETCH_TIMEOUT_MS);
       }));
   var meta={ offline:!online, stale:0, ts:0 };
   lista.forEach(function(cfg, i){
@@ -1014,12 +1040,13 @@ async function computeClasificacion(liveDocs){
       else { docs=[]; meta.stale++; }
     }
     docs=clasifMerge(cfg, docs, clasifLocalDocs(cfg));
-    var ranked=dedupeBest(docs, cfg.metric, cfg.better);
+    if(cfg.clasifFilter) docs=docs.filter(cfg.clasifFilter);
+    var ranked=dedupeBest(docs, cfg.clasifMetric||cfg.metric, cfg.better);
     ranked.slice(0,MOTOGP_POINTS.length).forEach(function(r, idx){
       var pts=pointsFor(idx);
       if(!totals[r.name]) totals[r.name]={ name:r.name, points:0, apps:[] };
       totals[r.name].points += pts;
-      totals[r.name].apps.push({ app:cfg.name, pos:idx+1, pts:pts, val:r.val, unidad:cfg.unidad });
+      totals[r.name].apps.push({ app:cfg.name, pos:idx+1, pts:pts, val:r.val, unidad:cfg.unidad, doc:r.doc, fmt:cfg.clasifFmt });
     });
   });
   var list=Object.keys(totals).map(function(k){ return totals[k]; });
@@ -1068,7 +1095,7 @@ async function renderClasificacion(){
   host.innerHTML='<div class="hint">Calculando\u2026</div>';
   var lista=APP_ADAPTERS.filter(function(a){ return a.inClasif; });
   lista.forEach(function(cfg){
-    var u=window.hubWatchRanking(clasifCol(cfg), cfg.match, function(docs){
+    var u=window.hubWatchRanking(clasifCol(cfg), cfg.clasifMatch||cfg.match, function(docs){
       clasifLive[cfg.slug]=docs;
       clasifSaveCache(cfg.slug, docs, clasifCol(cfg));
       if(!clasifPainted){
@@ -1105,7 +1132,7 @@ function paintClasificacion(list, meta){
   var me=getMe();
   list.forEach(function(row, idx){
     var medal = idx===0?' gold':(idx===1?' silver':(idx===2?' bronze':''));
-    var detalle = row.apps.map(function(a){ return '<div class="clasif-det-line"><span>'+esc(a.app)+'</span><span>'+fmtVal(a.val,{unidad:a.unidad})+'</span></div>'; }).join('');
+    var detalle = row.apps.map(function(a){ return '<div class="clasif-det-line"><span>'+esc(a.app)+'</span><span>'+(a.fmt ? a.fmt(a.doc) : fmtVal(a.val,{unidad:a.unidad}))+'</span></div>'; }).join('');
     html += '<div class="clasif-row'+(me && row.name===me?' is-me':'')+'">'
       + '<div class="clasif-pos'+medal+'">'+(idx+1)+'</div>'
       + '<div class="clasif-mid"><div class="clasif-name">'+esc(row.name)+'</div><div class="clasif-detalle">'+detalle+'</div></div>'
