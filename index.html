@@ -255,7 +255,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v29</div>
+    <div class="app-ver">v30</div>
   </footer>
 
 </div>
@@ -986,23 +986,25 @@ function withTimeout(promise, ms){
    cada icono instalado por separado tiene el suyo aislado). Al volver la red,
    las marcas suben y el recalculo las incluye (dedupe por contenido). */
 var CLASIF_CACHE_PREFIX='suiterds_clasif_cache_';
-var CLASIF_LOCAL_KEY={
-  'rds-ballcoordination-test':function(m){ return m.mode==='limite' ? 'coord1_lb_limite' : 'coord1_lb_'+m.mode+'_'+m.count+(m.penaliza?'_p1':'_p0'); },
-  'rds-lightsreaction-test':function(m){ return 'rds_lst_'+m.mode+'_'+m.stim+'_'+m.total; },
-  'rds-perception-test':function(m){ return 'rds_pst_'+m.mode+'_'+m.stim+'_'+m.total; },
-  'rds-processing-test':function(m){ return 'rds_prst_'+m.mode+'_'+m.stim+'_'+m.total; },
-  'rds-circuit-test':function(m){ return 'rds_circ_'+m.s1+'_'+m.s2+'_'+m.s3; },
-  'rds-reactiontrial-test':function(m){ return 'rds_rtrial_'+m.s1+'_'+m.s2+'_'+m.s3; },
-  'rds-memorycards-test':function(m){ return 'rds_mc_'+m.modo; },
-  'rds-reaction-test':function(m,cfg){ return 'rds_rank_'+clasifCol(cfg).replace('scores_reaction_',''); },
-  'rds-reactiontenis-test':function(m){ return 'rtenis_lb_'+m.mode+'_'+m.count+(m.penaliza?'_p1':'_p0'); },
-  'rds-reactionkarate-test':function(m){ return 'rds_rkarate_'+m.s1+'_'+m.s2+'_'+m.s3; }
-};
-function clasifCol(cfg){ return cfg.clasifCollection||cfg.collection; }
+/* 2026-10-01: de lo local solo se suman las marcas PENDIENTES de subir (la cola
+   *_pending de cada app, ver PENDING_KEYS), NO todo el historial local. Antes se
+   sumaba todo lo guardado en el movil y, si alguna marca nunca llego a Firestore,
+   solo ese movil la contaba y las clasificaciones de distintos aparatos no
+   coincidian. Asi, en cuanto una marca sube, todos los aparatos ven lo mismo. */
 function clasifLocalDocs(cfg){
-  var f=CLASIF_LOCAL_KEY[cfg.slug]; if(!f) return [];
-  try{ var v=JSON.parse(localStorage.getItem(f(cfg.clasifMatch||cfg.match||{},cfg))||'[]'); return Array.isArray(v)?v:[]; }catch(e){ return []; }
+  var k=PENDING_KEYS[cfg.slug]; if(!k) return [];
+  var arr=[]; try{ arr=JSON.parse(localStorage.getItem(k)||'[]'); if(!Array.isArray(arr)) arr=[]; }catch(e){ arr=[]; }
+  var col=clasifCol(cfg), m=cfg.clasifMatch||cfg.match||null;
+  return arr.map(function(x){
+    if(cfg.slug==='rds-reaction-test') return (x && x.col===col) ? x.entry : null;   // su cola guarda {col, entry}
+    return x;
+  }).filter(function(d){
+    if(!d) return false;
+    if(m){ for(var kk in m){ if(String(d[kk])!==String(m[kk])) return false; } }
+    return true;
+  });
 }
+function clasifCol(cfg){ return cfg.clasifCollection||cfg.collection; }
 function clasifDocKey(cfg,d){
   if(cfg.slug==='rds-reaction-test') return (d.name||'')+'|'+d.avg+'|'+(d.date||'');   // sus marcas locales no llevan ts
   var mt=cfg.clasifMetric||cfg.metric;
@@ -1031,7 +1033,7 @@ async function computeClasificacion(liveDocs){
         if(!online) return null;
         return withTimeout(window.hubFetchRanking(clasifCol(cfg), cfg.clasifMatch||cfg.match), FETCH_TIMEOUT_MS);
       }));
-  var meta={ offline:!online, stale:0, ts:0 };
+  var meta={ offline:!online, stale:0, ts:0, n:lista.length, at:Date.now() };
   lista.forEach(function(cfg, i){
     var docs=results[i];
     if(docs){ clasifSaveCache(cfg.slug, docs, clasifCol(cfg)); }
@@ -1053,6 +1055,14 @@ async function computeClasificacion(liveDocs){
   var list=Object.keys(totals).map(function(k){ return totals[k]; });
   list.sort(function(a,b){ return b.points-a.points; });
   return { list:list, meta:meta };
+}
+/* Pie de diagnostico (2026-10-01): version de SuiteRDS, hora del calculo y de donde salen los datos, para poder comparar dos aparatos. */
+function clasifFooterHtml(meta){
+  if(!meta) return '';
+  var d=new Date(meta.at||Date.now());
+  var src = meta.offline ? 'sin conexi\u00f3n (copia guardada)' : (meta.stale ? ('en directo; '+meta.stale+' de '+meta.n+' desde copia') : 'en directo');
+  var ver=(document.querySelector('.app-ver')||{}).textContent||'';
+  return '<div class="hint" style="padding:8px 0 0;font-size:11px;color:#aaa;">'+ver+' \u00b7 calculada '+two2(d.getHours())+':'+two2(d.getMinutes())+':'+two2(d.getSeconds())+' \u00b7 '+src+'</div>';
 }
 function clasifNoteHtml(meta){
   if(!meta || (!meta.offline && !meta.stale)) return '';
@@ -1140,7 +1150,7 @@ function paintClasificacion(list, meta){
       + '<div class="clasif-pts">'+row.points+'</div>'
       + '</div>';
   });
-  html+='</div><button class="add-prueba" id="btnRefreshClasif" style="margin-top:14px;">Actualizar</button>';
+  html+='</div>'+clasifFooterHtml(meta)+'<button class="add-prueba" id="btnRefreshClasif" style="margin-top:14px;">Actualizar</button>';
   host.innerHTML=html;
   Array.prototype.forEach.call(host.querySelectorAll('.clasif-row'), function(r){ var n=r.querySelector('.clasif-name'); if(n && openNames[n.textContent]) r.classList.add('open'); });
   $('btnRefreshClasif').addEventListener('click', renderClasificacion);
