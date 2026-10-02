@@ -256,7 +256,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v32</div>
+    <div class="app-ver">v33</div>
   </footer>
 
 </div>
@@ -384,29 +384,70 @@ window.hubLoadChamps=async function(){
    falta ya existen, porque son la MISMA consulta que la app original). */
 /* Version en directo de hubFetchRanking (2026-10-01): onSnapshot sobre la misma
    consulta. Ignora las respuestas fromCache (sin servidor no hay datos reales); con includeMetadataChanges llega tambien el paso cache->servidor aunque los datos no cambien. */
+/* ===== Ranking INCREMENTAL (2-oct-2026): ahorra lecturas de Firestore =====
+   Copia local por coleccion; solo se piden los documentos nuevos (ts >= ultimo-6h); lectura completa la primera vez
+   y cada 7 dias; escucha en directo solo sobre lo nuevo. El filtro (match) se aplica en el cliente. */
+function mkInc(COL,TSF,KEY,STRIP){
+  var WEEK=7*864e5, MARGIN=6*36e5, c={docs:{},full:0,ts:0}, loaded=false;
+  function load(){ if(loaded) return; loaded=true; try{ var o=JSON.parse(localStorage.getItem(KEY)||'null'); if(o&&o.docs&&typeof o.docs==='object') c=o; }catch(e){} }
+  function save(){ try{ localStorage.setItem(KEY,JSON.stringify(c)); }catch(e){} }
+  function strip(r){ if(STRIP&&r&&r[STRIP]!==undefined) delete r[STRIP]; return r; }
+  function put(id,r){ c.docs[id]=r; var t=r&&r[TSF]; if(typeof t==='number'&&t>c.ts&&t<=Date.now()+36e5) c.ts=t; }
+  function rows(f){ var out=[],id,r; for(id in c.docs){ r=c.docs[id]; if(!f||f(r)) out.push(r); } return out; }
+  function need(){ return !c.full||Date.now()-c.full>WEEK||!Object.keys(c.docs).length; }
+  function tailQ(){ return query(collection(db,COL), where(TSF,'>=',Math.max(0,c.ts-MARGIN))); }
+  function fullLoad(){ return getDocs(collection(db,COL)).then(function(snap){ c.docs={}; c.ts=0; snap.forEach(function(d){ put(d.id,strip(d.data())); }); c.full=Date.now(); save(); }); }
+  return {
+    watch:function(f,cb){
+      if(!db) return null; load();
+      var unsub=null, dead=false;
+      if(Object.keys(c.docs).length){ try{ cb(rows(f)); }catch(e){} }
+      function listen(){
+        if(dead) return;
+        try{
+          unsub=onSnapshot(tailQ(), { includeMetadataChanges:true }, function(snap){
+            if(snap.metadata.fromCache) return;   // sin servidor no hay datos reales: no pisar la copia guardada
+            snap.docChanges().forEach(function(ch){ if(ch.type==='removed') delete c.docs[ch.doc.id]; else put(ch.doc.id,strip(ch.doc.data())); });
+            save(); cb(rows(f));
+          }, function(){});
+        }catch(e){}
+      }
+      if(need()){ fullLoad().then(function(){ if(dead) return; cb(rows(f)); listen(); }).catch(function(){}); }
+      else listen();
+      return function(){ dead=true; if(unsub){ try{ unsub(); }catch(e){} unsub=null; } };
+    },
+    load:async function(f){
+      if(!db) return null; load();
+      try{
+        if(need()) await fullLoad();
+        else { var snap=await getDocs(tailQ()); snap.forEach(function(d){ put(d.id,strip(d.data())); }); save(); }
+        return rows(f);
+      }catch(e){ return null; }
+    }
+  };
+}
+var INC_BY_COL={};
+function incFor(collName){
+  if(!INC_BY_COL[collName]){
+    var tsf=(collName==='scores_ballcoordination'||collName==='scores_reactiontenis') ? 'date' : 'ts';
+    INC_BY_COL[collName]=mkInc(collName, tsf, 'suiterds_inc_'+collName, collName==='scores_reactiontenis'?'balls':null);
+  }
+  return INC_BY_COL[collName];
+}
+function matchFn(matchObj){
+  if(!matchObj) return null;
+  var ks=Object.keys(matchObj);
+  return function(r){ for(var i=0;i<ks.length;i++){ if(r[ks[i]]!==matchObj[ks[i]]) return false; } return true; };
+}
+/* Versiones incrementales (mismas firmas que antes). */
 window.hubWatchRanking=function(collName, matchObj, cb){
   if(!db) return null;
-  try{
-    var constraints=[];
-    if(matchObj){ for(var k in matchObj){ constraints.push(where(k, '==', matchObj[k])); } }
-    var q = constraints.length ? query(collection(db,collName), ...constraints) : collection(db,collName);
-    return onSnapshot(q, { includeMetadataChanges:true }, function(snap){
-      if(snap.metadata.fromCache) return;
-      var out=[]; snap.forEach(function(d){ out.push(d.data()); });
-      cb(out);
-    }, function(){});
-  }catch(e){ return null; }
+  try{ return incFor(collName).watch(matchFn(matchObj), cb); }catch(e){ return null; }
 };
 window.hubFetchRanking=async function(collName, matchObj){
   if(!db) return [];
-  try{
-    var constraints=[];
-    if(matchObj){ for(var k in matchObj){ constraints.push(where(k, '==', matchObj[k])); } }
-    var q = constraints.length ? query(collection(db,collName), ...constraints) : collection(db,collName);
-    const snap=await getDocs(q);
-    const out=[]; snap.forEach(function(d){ out.push(d.data()); });
-    return out;
-  }catch(e){ return null; }
+  var out=await incFor(collName).load(matchFn(matchObj));
+  return out;   // null si falla (igual que antes)
 };
 </script>
 
