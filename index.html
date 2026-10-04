@@ -256,7 +256,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v33</div>
+    <div class="app-ver">v34</div>
   </footer>
 
 </div>
@@ -370,13 +370,18 @@ window.hubDeleteChamp=async function(id){
   if(!db) throw new Error('no-db');
   return deleteDoc(doc(db,'hub_campeonatos',id));
 };
+/* 2026-10-04: devuelve null si falla la lectura (antes devolvia [] y la app decia "no hay
+   campeonatos" aunque los hubiera) y no se queda colgada mas de 10 s. */
 window.hubLoadChamps=async function(){
-  if(!db) return [];
+  if(!db) return null;
   try{
-    const snap=await getDocs(collection(db,'hub_campeonatos'));
+    const snap=await Promise.race([
+      getDocs(collection(db,'hub_campeonatos')),
+      new Promise(function(_,rej){ setTimeout(function(){ rej(new Error('timeout')); }, 10000); })
+    ]);
     const out=[]; snap.forEach(function(d){ out.push(Object.assign({id:d.id}, d.data())); });
     return out;
-  }catch(e){ return []; }
+  }catch(e){ return null; }
 };
 /* Lectura generica de una coleccion de ranking de cualquier app de la
    suite, con hasta 3 filtros de igualdad (mismo patron where() que ya usa
@@ -521,7 +526,7 @@ $('tabs').addEventListener('click', function(e){
   var b=e.target.closest('button'); if(!b) return;
   var id=b.getAttribute('data-tab');
   showTab(id);
-  if(id==='clasificacion') renderClasificacion();
+  if(id==='clasificacion') renderClasificacion(); if(id==='campeonatos') loadChamps();
 });
 
 /* ---------- Rankings: rejilla de botones ---------- */
@@ -1273,12 +1278,13 @@ function champFullName(c){
 }
 function appNameOf(slug){ var a=APPS.filter(function(x){ return x.slug===slug; })[0]; return a?a.name:slug; }
 function renderChampList(){
+  var note = champsFromCache ? '<div class="hint" style="padding:0 0 10px;text-align:left;">No se pudo leer el servidor: campeonatos guardados en este dispositivo (pueden no estar al d\u00eda).</div>' : '';
   var host=$('champList');
   if(!CHAMPS.length){
-    host.innerHTML='<div class="hint">A&#250;n no hay campeonatos creados.</div>';
+    host.innerHTML=note+'<div class="hint">A&#250;n no hay campeonatos creados.</div>';
     return;
   }
-  host.innerHTML='';
+  host.innerHTML=note;
   CHAMPS.forEach(function(c){
     var card=document.createElement('div'); card.className='champ-card';
     var pruebasTxt=(c.entries||[]).map(function(e){
@@ -1297,8 +1303,24 @@ function renderChampList(){
   host.querySelectorAll('.del').forEach(function(b){ b.addEventListener('click', function(){ deleteChamp(b.getAttribute('data-id')); }); });
 }
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+/* 2026-10-04: el modulo de Firebase (type=module) se ejecuta DESPUES de este script, asi que
+   al abrir la app window.hubLoadChamps aun no existia y la lista se rellenaba con [] ("Aun no
+   hay campeonatos") sin reintentar: solo se veian tras guardar uno nuevo, no al volver a entrar.
+   Ahora se espera a que este listo, se relee al entrar en la pestana, y si la lectura falla se
+   usa la ultima lista conocida de este dispositivo (con aviso) en vez de dar la lista por vacia. */
+var CHAMPS_CACHE_KEY='suiterds_champs_cache', champsFromCache=false;
 async function loadChamps(){
-  CHAMPS = window.hubLoadChamps ? (await window.hubLoadChamps()) : [];
+  var t0=Date.now();
+  while(!window.hubLoadChamps && Date.now()-t0<10000){ await new Promise(function(r){ setTimeout(r,100); }); }
+  var res = window.hubLoadChamps ? await window.hubLoadChamps() : null;
+  if(res===null){
+    var cached=null; try{ cached=JSON.parse(localStorage.getItem(CHAMPS_CACHE_KEY)||'null'); }catch(e){}
+    CHAMPS = Array.isArray(cached) ? cached : [];
+    champsFromCache = true;
+  } else {
+    CHAMPS = res; champsFromCache = false;
+    try{ localStorage.setItem(CHAMPS_CACHE_KEY, JSON.stringify(res)); }catch(e){}
+  }
   CHAMPS.sort(function(a,b){ return (a.number||0)-(b.number||0) || (a.createdAt||0)-(b.createdAt||0); });
   renderChampList();
 }
