@@ -121,7 +121,7 @@ if('serviceWorker' in navigator){
   .section-title{font-weight:900;letter-spacing:1px;text-transform:uppercase;font-size:13px;color:var(--rojo);margin:2px 0 10px;text-align:center;}
 
   /* ---------- Campeonatos ---------- */
-  .admin-bar{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-bottom:10px;}
+  .admin-bar{display:flex;align-items:center;justify-content:center;gap:8px;margin:18px 0 6px;}
   .admin-chip{font-size:10.5px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:#1a7a35;border:1.5px solid #1a7a35;border-radius:12px;padding:4px 10px;}
   .admin-lock{background:#111;color:#fff;border:0;border-radius:12px;padding:6px 12px;font-size:11px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer;}
   .champ-card{border:2px solid var(--borde);border-radius:10px;padding:12px 14px;margin-bottom:10px;background:#fff;}
@@ -262,19 +262,19 @@ if('serviceWorker' in navigator){
 
     <!-- ================= CAMPEONATOS ================= -->
     <section class="panel" id="panel-campeonatos">
-      <div class="admin-bar" id="adminBar"></div>
-      <div id="adminLoginBox"></div>
       <div id="champForm"></div>
       <button class="btn-new-champ" id="btnNewChamp" style="display:none;">+ Nuevo campeonato</button>
       <div id="champList"></div>
       <div id="champTableView" style="display:none;"></div>
+      <div id="adminLoginBox"></div>
+      <div class="admin-bar" id="adminBar"></div>
     </section>
 
   </main>
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v35</div>
+    <div class="app-ver">v36</div>
   </footer>
 
 </div>
