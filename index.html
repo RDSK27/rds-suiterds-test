@@ -148,6 +148,24 @@ if('serviceWorker' in navigator){
   .clasif-row.open .clasif-detalle{display:block;}
   .clasif-pts{flex:none;font-weight:900;font-size:17px;color:var(--rojo);min-width:26px;text-align:right;}
 
+  /* ---------- Campeonatos (2026-10-04): tarjeta plegable + lista de pruebas ---------- */
+  .champ-head{cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .champ-head::after{content:'\25B8';color:var(--rojo);font-size:14px;}
+  .champ-card.open .champ-head::after{content:'\25BE';}
+  .champ-detail{display:none;margin-top:8px;}
+  .champ-card.open .champ-detail{display:block;}
+  ul.champ-ex{list-style:disc;padding-left:18px;margin:0 0 8px;font-size:12px;line-height:1.7;color:#444;}
+  ul.champ-ex b{color:var(--negro);}
+  .champ-view-list{margin:0 0 12px;}
+  .ct-toggle{display:flex;gap:8px;margin:0 0 10px;}
+  .ct-toggle button{flex:1;padding:8px 6px;border:2px solid var(--borde);border-radius:6px;background:#fff;font-weight:800;font-size:11.5px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;color:var(--negro);}
+  .ct-toggle button.on{background:#111;color:#fff;border-color:#111;}
+  table.champ-table th.sortable{cursor:pointer;}
+  table.champ-table th.sorted{background:var(--rojo);color:#fff;}
+  table.champ-table td.sorted{background:#fdecea !important;}
+  table.champ-table td.ct-np{color:#aaa;}
+  table.champ-table th.ct-num, table.champ-table td.ct-num{color:#888;font-weight:700;}
+
   /* ---------- Tabla de campeonato ---------- */
   .champ-table-back{background:none;border:0;color:var(--rojo);font-weight:800;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;padding:6px 0 12px;}
   .champ-table-title{font-weight:900;font-size:17px;text-transform:uppercase;letter-spacing:0.02em;margin-bottom:10px;}
@@ -256,7 +274,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v34</div>
+    <div class="app-ver">v35</div>
   </footer>
 
 </div>
@@ -1277,6 +1295,25 @@ function champFullName(c){
   return c.number ? ('Campeonato '+c.number+' - '+(c.title||'')) : (c.title||'');
 }
 function appNameOf(slug){ var a=APPS.filter(function(x){ return x.slug===slug; })[0]; return a?a.name:slug; }
+/* 2026-10-04: la tarjeta muestra solo el nombre; al pulsarlo se despliega la lista de pruebas
+   ("App: modo - modo - modo") y debajo el boton Ver tabla (y Editar/Borrar si eres admin). */
+var CHAMP_OPEN={};
+function capFirst(s){ s=String(s||''); return s.charAt(0).toUpperCase()+s.slice(1); }
+function champEntryParts(e){
+  var adapter=adapterOf(e.app), mode='';
+  if(adapter && adapter.dims && adapter.dimLabel){
+    var vals=e.dimValues || defaultDimValues(adapter);
+    mode=String(adapter.dimLabel(vals)).split(', ').map(capFirst).join(' - ');
+  }
+  return { app:appNameOf(e.app), mode:mode };
+}
+function champExListHtml(c){
+  var items=(c.entries||[]).map(function(e){
+    var pr=champEntryParts(e);
+    return '<li><b>'+esc(pr.app)+'</b>'+(pr.mode?(': '+esc(pr.mode)):'')+'</li>';
+  }).join('');
+  return '<ul class="champ-ex">'+items+'</ul>';
+}
 function renderChampList(){
   var note = champsFromCache ? '<div class="hint" style="padding:0 0 10px;text-align:left;">No se pudo leer el servidor: campeonatos guardados en este dispositivo (pueden no estar al d\u00eda).</div>' : '';
   var host=$('champList');
@@ -1286,18 +1323,18 @@ function renderChampList(){
   }
   host.innerHTML=note;
   CHAMPS.forEach(function(c){
-    var card=document.createElement('div'); card.className='champ-card';
-    var pruebasTxt=(c.entries||[]).map(function(e){
-      var adapter=adapterOf(e.app);
-      var nm=(adapter && adapter.dims && e.dimValues) ? (adapter.name+' &middot; '+esc(adapter.dimLabel(e.dimValues))) : appNameOf(e.app);
-      return nm+' ('+tipoLabel(e.tipo)+')';
-    }).join('<br>');
-    card.innerHTML='<h3>'+esc(champFullName(c))+'</h3>'
-      +'<div class="pruebas">'+pruebasTxt+'</div>'
+    var card=document.createElement('div'); card.className='champ-card'+(CHAMP_OPEN[c.id]?' open':'');
+    card.innerHTML='<h3 class="champ-head" data-id="'+c.id+'">'+esc(champFullName(c))+'</h3>'
+      +'<div class="champ-detail">'+champExListHtml(c)
       +'<button class="champ-open" data-id="'+c.id+'">Ver tabla</button>'
-      +(isAdmin()?('<div class="champ-actions"><button class="edit" data-id="'+c.id+'">Editar</button><button class="danger del" data-id="'+c.id+'">Borrar</button></div>'):'');
+      +(isAdmin()?('<div class="champ-actions"><button class="edit" data-id="'+c.id+'">Editar</button><button class="danger del" data-id="'+c.id+'">Borrar</button></div>'):'')
+      +'</div>';
     host.appendChild(card);
   });
+  host.querySelectorAll('.champ-head').forEach(function(h){ h.addEventListener('click', function(){
+    var card=h.parentNode, id=h.getAttribute('data-id');
+    var open=!card.classList.contains('open'); card.classList.toggle('open', open); CHAMP_OPEN[id]=open;
+  }); });
   host.querySelectorAll('.champ-open').forEach(function(b){ b.addEventListener('click', function(){ openChampTable(b.getAttribute('data-id')); }); });
   host.querySelectorAll('.edit').forEach(function(b){ b.addEventListener('click', function(){ openChampForm(b.getAttribute('data-id')); }); });
   host.querySelectorAll('.del').forEach(function(b){ b.addEventListener('click', function(){ deleteChamp(b.getAttribute('data-id')); }); });
@@ -1360,6 +1397,9 @@ function resolveEntryQuery(adapter, entry){
   }
   return { collection:adapter.collection, match:adapter.match, label:adapter.name };
 }
+/* 2026-10-04: puntos del campeonato = SUMA DE PUESTOS (gana quien menos suma). En cada prueba:
+   los empates a resultado comparten el puesto mas alto (1,2,3,3,5...); quien no tiene marca
+   puntua participantes+1; si nadie ha hecho la prueba la columna queda vacia y no suma. */
 async function computeChampTable(entries){
   var valid=entries.map(function(entry){
     var adapter=adapterOf(entry.app); if(!adapter) return null;
@@ -1370,23 +1410,33 @@ async function computeChampTable(entries){
   var results=await Promise.all(valid.map(function(x){
     return withTimeout(window.hubFetchRanking(x.q.collection, x.q.match), FETCH_TIMEOUT_MS);
   }));
-  var columns=[], rows={};
+  var columns=[], byName={};
   valid.forEach(function(x, i){
     var adapter=x.adapter, docs=results[i];
-    var col={ label:x.q.label, tipo:x.entry.tipo, unidad:adapter.unidad, adapter:adapter };
-    columns.push(col);
+    var col={ label:appNameOf(x.entry.app), adapter:adapter, N:0 };
+    columns.push(col); var ci=columns.length-1;
     if(docs==null) return;   // fallo o timeout en esa prueba -- columna vacia, no rompe las demas
     var ranked=dedupeBest(docs, adapter.metric, adapter.better);
+    col.N=ranked.length;
+    var prevVal=null, prevPos=0;
     ranked.forEach(function(r, idx){
-      if(!rows[r.name]) rows[r.name]={ name:r.name, cells:{}, points:0 };
-      var pts=pointsFor(idx);
-      rows[r.name].cells[col.label+'#'+columns.length]={ pos:idx+1, val:r.val, pts:pts };
-      rows[r.name].points+=pts;
+      var pos=(prevVal!==null && r.val===prevVal) ? prevPos : idx+1;
+      prevVal=r.val; prevPos=pos;
+      var row=byName[r.name]||(byName[r.name]={ name:r.name, cells:[] });
+      row.cells[ci]={ pos:pos, val:r.val, part:true };
     });
   });
-  var list=Object.keys(rows).map(function(k){ return rows[k]; });
-  list.sort(function(a,b){ return b.points-a.points; });
-  return { columns:columns, rows:list };
+  var rows=Object.keys(byName).map(function(k){ return byName[k]; });
+  rows.forEach(function(row){
+    var total=0;
+    columns.forEach(function(col, ci){
+      if(!col.N) return;
+      if(!row.cells[ci]) row.cells[ci]={ pos:col.N+1, val:null, part:false };   // sin marca: participantes + 1
+      total+=row.cells[ci].pos;
+    });
+    row.total=total;
+  });
+  return { columns:columns, rows:rows };
 }
 async function openChampTable(id){
   var c=CHAMPS.filter(function(x){ return x.id===id; })[0]; if(!c) return;
@@ -1411,42 +1461,72 @@ function closeChampTable(){
   $('champList').style.display='';
   $('btnNewChamp').style.display=isAdmin()?'':'none';
 }
+var CT=null;   // estado de la tabla abierta: {c, data, view:'pos'|'res', sort:'total'|'name'|indice de columna}
+function ctCmpName(a,b){ return a.name<b.name ? -1 : (a.name>b.name ? 1 : 0); }
+function sortChampRows(data, key, view){
+  var rows=data.rows.slice();
+  rows.sort(function(a,b){
+    if(key==='name') return ctCmpName(a,b);
+    if(key==='total') return (a.total-b.total) || ctCmpName(a,b);
+    var ca=a.cells[key], cb=b.cells[key], d;
+    if(!ca && !cb) return (a.total-b.total) || ctCmpName(a,b);   // columna sin datos
+    if(!ca) return 1; if(!cb) return -1;
+    if(view==='res'){
+      if(ca.part!==cb.part) return ca.part ? -1 : 1;
+      if(ca.part){ d = (data.columns[key].adapter.better==='lower') ? (ca.val-cb.val) : (cb.val-ca.val); return d || (a.total-b.total) || ctCmpName(a,b); }
+    }
+    d=ca.pos-cb.pos; return d || (a.total-b.total) || ctCmpName(a,b);
+  });
+  return rows;
+}
+function ctHeadHtml(c){
+  return '<button class="champ-table-back" id="btnBackChamp">&larr; Volver a Campeonatos</button>'
+    +'<div class="champ-table-title">'+esc(champFullName(c))+'</div>'
+    +'<div class="champ-view-list">'+champExListHtml(c)+'</div>';
+}
 function paintChampTable(c, data){
   var view=$('champTableView');
   if(!data.columns.length){
-    view.innerHTML='<button class="champ-table-back" id="btnBackChamp">&larr; Volver a Campeonatos</button>'
-      +'<div class="champ-table-title">'+esc(champFullName(c))+'</div>'
-      +'<div class="hint">Este campeonato no tiene pruebas validas todavía.</div>';
+    view.innerHTML=ctHeadHtml(c)+'<div class="hint">Este campeonato no tiene pruebas validas todav\u00eda.</div>';
     $('btnBackChamp').addEventListener('click', closeChampTable);
     return;
   }
   if(!data.rows.length){
-    view.innerHTML='<button class="champ-table-back" id="btnBackChamp">&larr; Volver a Campeonatos</button>'
-      +'<div class="champ-table-title">'+esc(champFullName(c))+'</div>'
-      +'<div class="hint">Todavía no hay marcas guardadas en ninguna de estas pruebas.</div>';
+    view.innerHTML=ctHeadHtml(c)+'<div class="hint">Todav\u00eda no hay marcas guardadas en ninguna de estas pruebas.</div>';
     $('btnBackChamp').addEventListener('click', closeChampTable);
     return;
   }
-  var thead='<tr><th class="champ-name-th">Jugador</th>';
-  data.columns.forEach(function(col){ thead+='<th>'+esc(col.label)+'<br>('+tipoLabel(col.tipo)+')</th>'; });
-  thead+='<th>Total</th></tr>';
-  var tbody='';
-  var me=getMe();
-  data.rows.forEach(function(row){
-    tbody+='<tr'+(me && row.name===me?' class="is-me"':'')+'><td class="champ-name-cell">'+esc(row.name)+'</td>';
+  CT={ c:c, data:data, view:'pos', sort:'total' };
+  drawChampTable();
+}
+function drawChampTable(){
+  var c=CT.c, data=CT.data, view=$('champTableView');
+  var rows=sortChampRows(data, CT.sort, CT.view);
+  function sc(k){ return CT.sort===k ? ' sorted' : ''; }
+  var thead='<tr><th class="ct-num">#</th><th class="champ-name-th sortable'+sc('name')+'" data-sort="name">Jugador</th><th class="sortable'+sc('total')+'" data-sort="total">Total</th>';
+  data.columns.forEach(function(col, ci){ thead+='<th class="sortable'+sc(ci)+'" data-sort="'+ci+'">'+esc(col.label)+'</th>'; });
+  thead+='</tr>';
+  var me=getMe(), tbody='';
+  rows.forEach(function(row, ri){
+    tbody+='<tr'+(me && row.name===me?' class="is-me"':'')+'><td class="ct-num">'+(ri+1)+'</td><td class="champ-name-cell'+sc('name')+'">'+esc(row.name)+'</td><td class="champ-pts-cell'+sc('total')+'">'+row.total+'</td>';
     data.columns.forEach(function(col, ci){
-      var cell=row.cells[col.label+'#'+(ci+1)];
-      if(!cell){ tbody+='<td class="champ-empty">&mdash;</td>'; return; }
-      var shown = col.tipo==='avg' ? fmtVal(cell.val, col.adapter) : (cell.pos+'&#186;');
-      tbody+='<td>'+shown+'</td>';
+      var cell=row.cells[ci], txt='', cls=sc(ci);
+      if(cell && col.N){
+        if(CT.view==='pos'){ txt=String(cell.pos); if(!cell.part) cls+=' ct-np'; }
+        else if(cell.part){ txt=fmtVal(cell.val, col.adapter); }
+      }
+      tbody+='<td class="'+cls.trim()+'">'+txt+'</td>';
     });
-    tbody+='<td class="champ-pts-cell">'+row.points+'</td></tr>';
+    tbody+='</tr>';
   });
-  view.innerHTML='<button class="champ-table-back" id="btnBackChamp">&larr; Volver a Campeonatos</button>'
-    +'<div class="champ-table-title">'+esc(champFullName(c))+'</div>'
-    +'<div class="hint" style="padding:0 0 10px;text-align:left;">"Total" son puntos MotoGP seg&uacute;n el puesto en cada prueba (aunque la columna ense&ntilde;e el valor bruto).</div>'
+  view.innerHTML=ctHeadHtml(c)
+    +'<div class="ct-toggle"><button data-view="pos" class="'+(CT.view==='pos'?'on':'')+'">Puestos</button><button data-view="res" class="'+(CT.view==='res'?'on':'')+'">Resultados</button></div>'
     +'<div class="champ-table-scroll"><table class="champ-table"><thead>'+thead+'</thead><tbody>'+tbody+'</tbody></table></div>';
   $('btnBackChamp').addEventListener('click', closeChampTable);
+  view.querySelectorAll('.ct-toggle button').forEach(function(b){ b.addEventListener('click', function(){ CT.view=b.getAttribute('data-view'); drawChampTable(); }); });
+  view.querySelectorAll('th.sortable').forEach(function(h){ h.addEventListener('click', function(){
+    var k=h.getAttribute('data-sort'); CT.sort=(k==='name'||k==='total') ? k : parseInt(k,10); drawChampTable();
+  }); });
 }
 
 /* ---------- Campeonatos: crear / editar ---------- */
