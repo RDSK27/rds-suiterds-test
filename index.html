@@ -276,7 +276,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v38</div>
+    <div class="app-ver">v39</div>
   </footer>
 
 </div>
@@ -615,6 +615,10 @@ warmAllApps();
    guardado en el dispositivo para verlo sin red. Una app a la vez. Si la app aun no trae
    rdsPrepare (version antigua), se avisa. */
 var PREP_TS='suiterds_prep_ts';
+/* Orden de preparacion (pedido 2026-10-05): Karate antes que Tenis (la de Tenis es la mas pesada, va al final);
+   Rally Memory y Gimnasia no se preparan. */
+var PREP_SLUGS=['rds-reaction-test','rds-processing-test','rds-processing2-test','rds-perception-test','rds-ballcoordination-test',
+  'rds-lightsreaction-test','rds-memorycards-test','rds-reactiontrial-test','rds-circuit-test','rds-reactionkarate-test','rds-reactiontenis-test'];
 function prepareApp(slug){
   return new Promise(function(resolve){
     var done=false, t0=Date.now(), iframe=document.createElement('iframe');
@@ -644,11 +648,12 @@ async function prepareAll(){
   box.style.display='';
   if(!navigator.onLine){ box.textContent='Sin conexion: conectate a internet para preparar los rankings.'; return; }
   btn.disabled=true;
-  var rows=APPS.map(function(a){ return '<div id="prep-'+a.slug+'">&#9675; '+a.name+'</div>'; });
+  var LISTA=PREP_SLUGS.map(function(s){ return APPS.filter(function(a){ return a.slug===s; })[0]; }).filter(Boolean);
+  var rows=LISTA.map(function(a){ return '<div id="prep-'+a.slug+'">&#9675; '+a.name+'</div>'; });
   box.innerHTML=rows.join('');
   var fallos=0;
-  for(var i=0;i<APPS.length;i++){
-    var a=APPS[i], el=document.getElementById('prep-'+a.slug);
+  for(var i=0;i<LISTA.length;i++){
+    var a=LISTA[i], el=document.getElementById('prep-'+a.slug);
     el.innerHTML='&#8987; '+a.name+'...';
     var r=await prepareApp(a.slug);
     if(r===true) el.innerHTML='&#10003; '+a.name;
