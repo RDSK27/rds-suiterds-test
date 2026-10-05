@@ -264,6 +264,8 @@ if('serviceWorker' in navigator){
     <section class="panel" id="panel-campeonatos">
       <div id="champForm"></div>
       <button class="btn-new-champ" id="btnNewChamp" style="display:none;">+ Nuevo campeonato</button>
+      <button class="btn-new-champ" id="btnPrepare" style="display:none;">Preparar rankings offline</button>
+      <div id="prepBox" style="display:none;font-size:13px;line-height:1.7;margin-bottom:14px;"></div>
       <div id="champList"></div>
       <div id="champTableView" style="display:none;"></div>
       <div id="adminLoginBox"></div>
@@ -274,7 +276,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v37</div>
+    <div class="app-ver">v38</div>
   </footer>
 
 </div>
@@ -606,6 +608,59 @@ async function warmAllApps(){
   }
 }
 warmAllApps();
+
+/* ---------- Preparar rankings offline (Admin, 2026-10-05) ----------
+   Abre cada app en un iframe oculto (mismo origen) y le pide rdsPrepare(): la app
+   sincroniza SU ranking (incremental: la 1a vez lee todo, luego solo lo nuevo) y lo deja
+   guardado en el dispositivo para verlo sin red. Una app a la vez. Si la app aun no trae
+   rdsPrepare (version antigua), se avisa. */
+var PREP_TS='suiterds_prep_ts';
+function prepareApp(slug){
+  return new Promise(function(resolve){
+    var done=false, t0=Date.now(), iframe=document.createElement('iframe');
+    iframe.style.cssText='position:absolute;width:0;height:0;border:0;visibility:hidden;';
+    iframe.src='https://rdsk27.github.io/'+slug+'/';
+    function finish(v){
+      if(done) return; done=true;
+      clearTimeout(safety); clearInterval(poll);
+      try{ iframe.remove(); }catch(e){}
+      resolve(v);
+    }
+    var safety=setTimeout(function(){ finish(false); }, 180000);
+    var poll=setInterval(function(){
+      try{
+        var w=iframe.contentWindow;
+        if(w && typeof w.rdsPrepare==='function'){
+          clearInterval(poll);
+          Promise.resolve(w.rdsPrepare()).then(function(ok){ finish(ok?true:false); }, function(){ finish(false); });
+        } else if(Date.now()-t0>25000){ finish(null); }
+      }catch(e){}
+    }, 300);
+    document.body.appendChild(iframe);
+  });
+}
+async function prepareAll(){
+  var btn=$('btnPrepare'), box=$('prepBox');
+  box.style.display='';
+  if(!navigator.onLine){ box.textContent='Sin conexion: conectate a internet para preparar los rankings.'; return; }
+  btn.disabled=true;
+  var rows=APPS.map(function(a){ return '<div id="prep-'+a.slug+'">&#9675; '+a.name+'</div>'; });
+  box.innerHTML=rows.join('');
+  var fallos=0;
+  for(var i=0;i<APPS.length;i++){
+    var a=APPS[i], el=document.getElementById('prep-'+a.slug);
+    el.innerHTML='&#8987; '+a.name+'...';
+    var r=await prepareApp(a.slug);
+    if(r===true) el.innerHTML='&#10003; '+a.name;
+    else { fallos++; el.innerHTML='&#10007; '+a.name+(r===null?' (version sin actualizar: abre la app con red y vuelve a intentarlo)':' (no se pudo, reintenta)'); }
+  }
+  if(!fallos){ try{ localStorage.setItem(PREP_TS,String(Date.now())); }catch(e){} }
+  var ts=0; try{ ts=+localStorage.getItem(PREP_TS)||0; }catch(e){}
+  var d=ts?new Date(ts):null;
+  box.insertAdjacentHTML('beforeend','<div style="margin-top:8px;font-weight:800;">'+(fallos?fallos+' app(s) sin preparar.':'Todo preparado.')+(d?' Ultima vez completa: '+d.toLocaleString('es-ES'):'')+'</div>');
+  btn.disabled=false;
+}
+$('btnPrepare').addEventListener('click', prepareAll);
 
 /* ---------- "Quien soy": resalta mi fila en Clasificacion y Campeonatos ----------
    Independiente del INI+deporte que cada una de las 12 apps guarda por su
@@ -1255,6 +1310,8 @@ function renderAdminBar(){
     });
   }
   $('btnNewChamp').style.display=isAdmin()?'':'none';
+  $('btnPrepare').style.display=isAdmin()?'':'none';
+  if(!isAdmin()) $('prepBox').style.display='none';
 }
 function closeAdminLogin(){ $('adminLoginBox').innerHTML=''; }
 function renderAdminLogin(){
