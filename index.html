@@ -276,7 +276,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v39</div>
+    <div class="app-ver">v40</div>
   </footer>
 
 </div>
@@ -412,7 +412,7 @@ window.hubLoadChamps=async function(){
 /* ===== Ranking INCREMENTAL (2-oct-2026): ahorra lecturas de Firestore =====
    Copia local por coleccion; solo se piden los documentos nuevos (ts >= ultimo-6h); lectura completa la primera vez
    y cada 7 dias; escucha en directo solo sobre lo nuevo. El filtro (match) se aplica en el cliente. */
-function mkInc(COL,TSF,KEY,STRIP){
+function mkInc(COL,TSF,KEY,STRIP,MASK){
   var WEEK=7*864e5, MARGIN=6*36e5, c={docs:{},full:0,ts:0}, loaded=false;
   function load(){ if(loaded) return; loaded=true; try{ var o=JSON.parse(localStorage.getItem(KEY)||'null'); if(o&&o.docs&&typeof o.docs==='object') c=o; }catch(e){} }
   function save(){ try{ localStorage.setItem(KEY,JSON.stringify(c)); }catch(e){} }
@@ -421,7 +421,16 @@ function mkInc(COL,TSF,KEY,STRIP){
   function rows(f){ var out=[],id,r; for(id in c.docs){ r=c.docs[id]; if(!f||f(r)) out.push(r); } return out; }
   function need(){ return !c.full||Date.now()-c.full>WEEK||!Object.keys(c.docs).length; }
   function tailQ(){ return query(collection(db,COL), where(TSF,'>=',Math.max(0,c.ts-MARGIN))); }
-  function fullLoad(){ return getDocs(collection(db,COL)).then(function(snap){ c.docs={}; c.ts=0; snap.forEach(function(d){ put(d.id,strip(d.data())); }); c.full=Date.now(); save(); }); }
+  function sdkFull(){ return getDocs(collection(db,COL)).then(function(snap){ c.docs={}; c.ts=0; snap.forEach(function(d){ put(d.id,strip(d.data())); }); c.full=Date.now(); save(); }); }
+  /* REST con mascara de campos (MASK): baja solo esos campos (Tenis: sin el detalle bola a bola, ~4,5 MB). Si falla, vuelve al SDK. */
+  function rv(v){ if('stringValue' in v) return v.stringValue; if('integerValue' in v) return Number(v.integerValue); if('doubleValue' in v) return Number(v.doubleValue); if('booleanValue' in v) return v.booleanValue; if('timestampValue' in v) return v.timestampValue;
+    if('arrayValue' in v) return (v.arrayValue.values||[]).map(rv); if('mapValue' in v){ var o={},fl=v.mapValue.fields||{},k; for(k in fl) o[k]=rv(fl[k]); return o; } return null; }
+  function restFull(){
+    var base='https://firestore.googleapis.com/v1/projects/'+db.app.options.projectId+'/databases/(default)/documents/'+COL+'?pageSize=300'+MASK.map(function(m){ return '&mask.fieldPaths='+encodeURIComponent(m); }).join(''), out=[];
+    function page(tok){ return fetch(base+(tok?'&pageToken='+encodeURIComponent(tok):'')).then(function(r){ if(!r.ok) throw new Error('rest'); return r.json(); }).then(function(j){ (j.documents||[]).forEach(function(d){ out.push(d); }); return j.nextPageToken?page(j.nextPageToken):out; }); }
+    return page('').then(function(docs){ c.docs={}; c.ts=0; docs.forEach(function(d){ var o={},fl=d.fields||{},k; for(k in fl) o[k]=rv(fl[k]); put(d.name.split('/').pop(),strip(o)); }); c.full=Date.now(); save(); });
+  }
+  function fullLoad(){ return MASK ? restFull().catch(function(){ return sdkFull(); }) : sdkFull(); }
   return {
     watch:function(f,cb){
       if(!db) return null; load();
@@ -455,7 +464,7 @@ var INC_BY_COL={};
 function incFor(collName){
   if(!INC_BY_COL[collName]){
     var tsf=(collName==='scores_ballcoordination'||collName==='scores_reactiontenis') ? 'date' : 'ts';
-    INC_BY_COL[collName]=mkInc(collName, tsf, 'suiterds_inc_'+collName, collName==='scores_reactiontenis'?'balls':null);
+    INC_BY_COL[collName]=mkInc(collName, tsf, 'suiterds_inc_'+collName, collName==='scores_reactiontenis'?'balls':null, collName==='scores_reactiontenis'?['avgRT','avgPrec','count','date','disc','hits','index','matchMode','mode','name','penaliza','readOk','readTotal','setScores','setsMe','setsRival','trials','won']:null);
   }
   return INC_BY_COL[collName];
 }
