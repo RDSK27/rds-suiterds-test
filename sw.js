@@ -1,5 +1,5 @@
 /* SuiteRDS - Service Worker */
-var CACHE = 'suiterds-v40';
+var CACHE = 'suiterds-v41';
 var ASSETS = [
   './',
   './index.html',
@@ -8,7 +8,21 @@ var ASSETS = [
   './icon-512.png',
   './apple-touch-icon.png',
   './banner.jpg',
-  './logo.png'
+  './logo.png',
+  /* iconos de la pestana Apps: se precargan al instalar (antes se guardaban al verlos; al cambiar de version la cache se vaciaba y, si el movil estaba sin red, salian sin icono) */
+  './icons/rds-reaction-test.png',
+  './icons/rds-processing-test.png',
+  './icons/rds-processing2-test.png',
+  './icons/rds-perception-test.png',
+  './icons/rds-ballcoordination-test.png',
+  './icons/rds-lightsreaction-test.png',
+  './icons/rds-memorycards-test.png',
+  './icons/rds-reactiontrial-test.png',
+  './icons/rds-circuit-test.png',
+  './icons/rds-reactiontenis-test.png',
+  './icons/rds-reactionkarate-test.png',
+  './icons/rds-rallymemory-test.png',
+  './icons/rds-gimnasia-test.png'
 ];
 
 self.addEventListener('install', function(e){
