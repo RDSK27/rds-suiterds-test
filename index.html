@@ -264,11 +264,11 @@ if('serviceWorker' in navigator){
     <!-- ================= CAMPEONATOS ================= -->
     <section class="panel" id="panel-campeonatos">
       <div id="champForm"></div>
+      <div id="champList"></div>
+      <div id="champTableView" style="display:none;"></div>
       <button class="btn-new-champ" id="btnNewChamp" style="display:none;">+ Nuevo campeonato</button>
       <button class="btn-new-champ" id="btnPrepare" style="display:none;">Preparar rankings offline</button>
       <div id="prepBox" style="display:none;font-size:13px;line-height:1.7;margin-bottom:14px;"></div>
-      <div id="champList"></div>
-      <div id="champTableView" style="display:none;"></div>
       <div id="adminLoginBox"></div>
       <div class="admin-bar" id="adminBar"></div>
     </section>
@@ -277,7 +277,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v44</div>
+    <div class="app-ver">v45</div>
   </footer>
 
 </div>
@@ -1514,7 +1514,7 @@ async function computeChampTable(entries){
 async function openChampTable(id){
   var c=CHAMPS.filter(function(x){ return x.id===id; })[0]; if(!c) return;
   $('champList').style.display='none';
-  $('btnNewChamp').style.display='none';
+  $('btnNewChamp').style.display='none'; $('btnPrepare').style.display='none'; $('prepBox').style.display='none';
   var view=$('champTableView');
   view.style.display='';
   view.innerHTML='<button class="champ-table-back" id="btnBackChamp">&larr; Volver a Campeonatos</button>'
@@ -1532,7 +1532,7 @@ function closeChampTable(){
   $('champTableView').style.display='none';
   $('champTableView').innerHTML='';
   $('champList').style.display='';
-  $('btnNewChamp').style.display=isAdmin()?'':'none';
+  $('btnNewChamp').style.display=isAdmin()?'':'none'; $('btnPrepare').style.display=isAdmin()?'':'none';
 }
 var CT=null;   // estado de la tabla abierta: {c, data, view:'pos'|'res', sort:'total'|'name'|indice de columna}
 function ctCmpName(a,b){ return a.name<b.name ? -1 : (a.name>b.name ? 1 : 0); }
