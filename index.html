@@ -102,7 +102,8 @@ if('serviceWorker' in navigator){
   .app-btn span{font-size:10.5px;font-weight:700;letter-spacing:0.02em;color:var(--negro);line-height:1.25;}
 
   /* ---------- "Quien soy" -- me resalta en Clasificacion/Campeonatos ---------- */
-  #meBar{padding:8px 16px 0;}
+  #meBar{padding:8px 16px 8px;border-bottom:1px solid #111;}   /* linea negra fina bajo INI/deporte: misma distancia (8px) que la de arriba hasta las pestanas */
+  .me-form.is-set input,.me-form.is-set select{border-color:var(--rojo);background:#fff5f4;}   /* ya marcado: mismo sombreado rojo claro que "is-me" en Clasificacion */
   .me-set{display:flex;align-items:center;justify-content:center;gap:8px;font-size:11px;color:#777;}
   .me-set b{color:var(--negro);letter-spacing:0.03em;}
   .me-set button{background:none;border:0;color:var(--rojo);font-weight:800;font-size:11px;text-transform:uppercase;cursor:pointer;padding:2px 0;}
@@ -276,7 +277,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v43</div>
+    <div class="app-ver">v44</div>
   </footer>
 
 </div>
@@ -705,7 +706,7 @@ function renderMeForm(){
   var host=$('meBar'), me=getMe();
   var parts=me ? me.split('-') : [], curIni=parts[0]||'', curDep=parts.slice(1).join('-')||'OTR';
   var opts=SPORT_OPTIONS.map(function(o){ return '<option value="'+o[0]+'"'+(o[0]===curDep?' selected':'')+'>'+o[1]+'</option>'; }).join('');
-  host.innerHTML='<div class="me-form">'
+  host.innerHTML='<div class="me-form'+(me?' is-set':'')+'">'
     +'<input type="text" id="meIniInput" placeholder="INI" maxlength="3" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" value="'+esc(curIni)+'">'
     +'<select id="meDepSelect">'+opts+'</select>'
     +'<button id="btnMeSave">'+(me?'Cambiar':'Marcarme')+'</button>'
