@@ -1,5 +1,5 @@
 /* SuiteRDS - Service Worker */
-var CACHE = 'suiterds-v46';
+var CACHE = 'suiterds-v47';
 var ASSETS = [
   './',
   './index.html',
@@ -22,7 +22,8 @@ var ASSETS = [
   './icons/rds-reactiontenis-test.png',
   './icons/rds-reactionkarate-test.png',
   './icons/rds-rallymemory-test.png',
-  './icons/rds-gimnasia-test.png'
+  './icons/rds-gimnasia-test.png',
+  './icons/rds-squares-test.png'
 ];
 
 self.addEventListener('install', function(e){

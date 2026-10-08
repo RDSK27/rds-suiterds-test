@@ -277,7 +277,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v46</div>
+    <div class="app-ver">v47</div>
   </footer>
 
 </div>
@@ -499,6 +499,7 @@ var APPS=[
   { slug:'rds-processing-test',       name:'Processing',        icon:'icons/rds-processing-test.png' },
   { slug:'rds-processing2-test',      name:'Processing 2',      icon:'icons/rds-processing2-test.png' },
   { slug:'rds-perception-test',       name:'Perception',        icon:'icons/rds-perception-test.png' },
+  { slug:'rds-squares-test',          name:'Squares Reaction',  icon:'icons/rds-squares-test.png' },
   { slug:'rds-ballcoordination-test', name:'Ball Coordination', icon:'icons/rds-ballcoordination-test.png' },
   { slug:'rds-lightsreaction-test',   name:'Lights Speed',      icon:'icons/rds-lightsreaction-test.png' },
   { slug:'rds-memorycards-test',      name:'Memory Cards',      icon:'icons/rds-memorycards-test.png' },
@@ -530,7 +531,7 @@ function appUrl(slug){
    (solo se ve si SuiteRDS y las apps comparten localStorage en este movil). */
 var PENDING_KEYS={
   'rds-ballcoordination-test':'coord1_pending', 'rds-lightsreaction-test':'rds_lst_pending', 'rds-perception-test':'rds_pst_pending',
-  'rds-processing-test':'rds_prst_pending', 'rds-processing2-test':'rds_prst2_pending', 'rds-rallymemory-test':'rds_rallymemory_pending', 'rds-reaction-test':'rds_rank_pending',
+  'rds-processing-test':'rds_prst_pending', 'rds-processing2-test':'rds_prst2_pending', 'rds-squares-test':'rds_sqr_pending', 'rds-rallymemory-test':'rds_rallymemory_pending', 'rds-reaction-test':'rds_rank_pending',
   'rds-reactiontenis-test':'rtenis_pending', 'rds-circuit-test':'rds_circ_pending', 'rds-gimnasia-test':'rds_gimnasia_pending',
   'rds-memorycards-test':'rds_mc_pending', 'rds-reactionkarate-test':'rds_rkarate_pending', 'rds-reactiontrial-test':'rds_rtrial_pending'
 };
@@ -628,7 +629,7 @@ var PREP_TS='suiterds_prep_ts';
 /* Orden de preparacion (pedido 2026-10-05): Karate antes que Tenis (la de Tenis es la mas pesada, va al final);
    Rally Memory y Gimnasia no se preparan. */
 var PREP_SLUGS=['rds-reaction-test','rds-processing-test','rds-processing2-test','rds-perception-test','rds-ballcoordination-test',
-  'rds-lightsreaction-test','rds-memorycards-test','rds-reactiontrial-test','rds-circuit-test','rds-reactionkarate-test','rds-reactiontenis-test'];
+  'rds-lightsreaction-test','rds-memorycards-test','rds-reactiontrial-test','rds-circuit-test','rds-squares-test','rds-reactionkarate-test','rds-reactiontenis-test'];
 function prepareApp(slug){
   return new Promise(function(resolve){
     var done=false, t0=Date.now(), iframe=document.createElement('iframe');
@@ -756,6 +757,9 @@ function tenisSetFmt(d){ var g=tenisSetGames(d); return g[0]+'-'+g[1]+' \u00b7 '
 /* Defensa: mas defensas primero (def), luego menor reaccion media. */
 function karateDefScore(d){ return -(d.def||0)*100000 + (d.avg!=null ? d.avg : 99999); }
 function karateDefFmt(d){ return (d.def||0)+'/'+(d.ensayos!=null ? d.ensayos : (d.def||0))+' \u00b7 '+Math.round(d.avg||0)+' ms'; }
+/* Squares Reaction (2026-10-08): mas cuadrados pulsados (ensayos) primero; si hay empate, menor reaccion media. */
+function sqScore(d){ return (d.ensayos||0)*100000 - (d.avg!=null ? d.avg : 99999); }   /* MAYOR = mejor (el adaptador usa better:'higher', como Campeonatos con 'ensayos') */
+function sqFmt(d){ return (d.ensayos||0)+' \u00b7 '+Math.round(d.avg||0)+' ms'; }
 var APP_ADAPTERS=[
   { slug:'rds-ballcoordination-test', name:'Ball Coordination',
     collection:'scores_ballcoordination', match:{mode:'normal', count:15, penaliza:true},
@@ -844,6 +848,17 @@ var APP_ADAPTERS=[
     buildMatch:function(v){
       return { mode:v.mode||'normal', stim:v.stim||'cambia', total:parseInt(v.total||'15',10) };
     } },
+  { slug:'rds-squares-test', name:'Squares Reaction',
+    collection:'scores_squares', match:{mode:'normal', stim:'a', total:'a'},
+    metric:'ensayos', better:'higher', unidad:'cuadrados', inClasif:true,
+    /* Clasificacion (2026-10-08, pedido): Normal por defecto. Las filas 2 y 3 de la app aun son '?' (a/b, a/b/c): se fijan a la 1a opcion hasta que se definan.
+       Puntua por cuadrados pulsados y, de desempate, reaccion media (sqScore/sqFmt). */
+    clasifMetric:sqScore, clasifFmt:sqFmt,
+    dims:[
+      { key:'mode', label:'Modo', def:'normal', options:[ {value:'normal',label:'Normal'} ] }
+    ],
+    dimLabel:function(v){ return 'Normal'; },
+    buildMatch:function(v){ return { mode:'normal', stim:'a', total:'a' }; } },
   { slug:'rds-processing2-test', name:'Processing 2',
     collection:'scores_processing2', match:{mode:'normal', stim:'estatico', total:25},
     metric:'avg', better:'lower', unidad:'ms', inClasif:true,
@@ -1465,6 +1480,7 @@ function fmtVal(val, adapter){
   if(adapter.unidad==='ms') return Math.round(val)+' ms';
   if(adapter.unidad==='s') return val.toFixed(2)+' s';
   if(adapter.unidad==='cartas') return val+' cartas';
+  if(adapter.unidad==='cuadrados') return val+' cuadrados';
   if(adapter.unidad==='pts') return val.toFixed(1)+' pts';
   return String(val);
 }
