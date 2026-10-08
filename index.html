@@ -277,7 +277,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v48</div>
+    <div class="app-ver">v49</div>
   </footer>
 
 </div>
@@ -756,9 +756,6 @@ function tenisSetFmt(d){ var g=tenisSetGames(d); return g[0]+'-'+g[1]+' \u00b7 '
 /* Defensa: mas defensas primero (def), luego menor reaccion media. */
 function karateDefScore(d){ return -(d.def||0)*100000 + (d.avg!=null ? d.avg : 99999); }
 function karateDefFmt(d){ return (d.def||0)+'/'+(d.ensayos!=null ? d.ensayos : (d.def||0))+' \u00b7 '+Math.round(d.avg||0)+' ms'; }
-/* Squares Reaction (2026-10-08): mas cuadrados pulsados (ensayos) primero; si hay empate, menor reaccion media. */
-function sqScore(d){ return (d.ensayos||0)*100000 - (d.avg!=null ? d.avg : 99999); }   /* MAYOR = mejor (el adaptador usa better:'higher', como Campeonatos con 'ensayos') */
-function sqFmt(d){ return (d.ensayos||0)+' \u00b7 '+Math.round(d.avg||0)+' ms'; }
 var APP_ADAPTERS=[
   { slug:'rds-ballcoordination-test', name:'Ball Coordination',
     collection:'scores_ballcoordination', match:{mode:'normal', count:15, penaliza:true},
@@ -848,16 +845,15 @@ var APP_ADAPTERS=[
       return { mode:v.mode||'normal', stim:v.stim||'cambia', total:parseInt(v.total||'15',10) };
     } },
   { slug:'rds-squares-test', name:'Squares Reaction',
-    collection:'scores_squares', match:{mode:'normal', stim:'a', total:'a'},
-    metric:'ensayos', better:'higher', unidad:'cuadrados', inClasif:true,
-    /* Clasificacion (2026-10-08, pedido): Normal por defecto. Las filas 2 y 3 de la app aun son '?' (a/b, a/b/c): se fijan a la 1a opcion hasta que se definan.
-       Puntua por cuadrados pulsados y, de desempate, reaccion media (sqScore/sqFmt). */
-    clasifMetric:sqScore, clasifFmt:sqFmt,
+    collection:'scores_squares', match:{mode:'normal', stim:'a', total:'25'},
+    metric:'avg', better:'lower', unidad:'ms', inClasif:false,   /* false MIENTRAS la app no este en la pestana Apps (si no sumaria puntos sin verse); ponerlo a true al mostrarla (probado: Normal 25 puntua bien) */
+    /* Clasificacion (2026-10-08): Normal, 25 por defecto; puntua por reaccion media (menor = mejor). La fila 2 de la app aun es '?' (a/b): se fija a la 1a.
+       Limite (cuadrados pulsados) no se ofrece aqui: su puntuacion es por aciertos. Los valores van como CADENAS (la app guarda total '25'/'50'/'100'). */
     dims:[
-      { key:'mode', label:'Modo', def:'normal', options:[ {value:'normal',label:'Normal'} ] }
+      { key:'total', label:'Cuadrados', def:'25', options:[ {value:'25',label:'25'},{value:'50',label:'50'},{value:'100',label:'100'} ] }
     ],
-    dimLabel:function(v){ return 'Normal'; },
-    buildMatch:function(v){ return { mode:'normal', stim:'a', total:'a' }; } },
+    dimLabel:function(v){ return 'Normal, '+(v.total||'25'); },
+    buildMatch:function(v){ return { mode:'normal', stim:'a', total:String(v.total||'25') }; } },
   { slug:'rds-processing2-test', name:'Processing 2',
     collection:'scores_processing2', match:{mode:'normal', stim:'estatico', total:25},
     metric:'avg', better:'lower', unidad:'ms', inClasif:true,
