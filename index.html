@@ -277,7 +277,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v49</div>
+    <div class="app-ver">v50</div>
   </footer>
 
 </div>
@@ -845,15 +845,15 @@ var APP_ADAPTERS=[
       return { mode:v.mode||'normal', stim:v.stim||'cambia', total:parseInt(v.total||'15',10) };
     } },
   { slug:'rds-squares-test', name:'Squares Reaction',
-    collection:'scores_squares', match:{mode:'normal', stim:'a', total:'25'},
+    collection:'scores_squares', match:{mode:'normal', stim:'a', total:'x1'},
     metric:'avg', better:'lower', unidad:'ms', inClasif:false,   /* false MIENTRAS la app no este en la pestana Apps (si no sumaria puntos sin verse); ponerlo a true al mostrarla (probado: Normal 25 puntua bien) */
-    /* Clasificacion (2026-10-08): Normal, 25 por defecto; puntua por reaccion media (menor = mejor). La fila 2 de la app aun es '?' (a/b): se fija a la 1a.
-       Limite (cuadrados pulsados) no se ofrece aqui: su puntuacion es por aciertos. Los valores van como CADENAS (la app guarda total '25'/'50'/'100'). */
+    /* Clasificacion (2026-10-08): Normal, x1 por defecto (v50: la app usa 16 cuadrados y x1/x2/x4 = 1/2/4 vueltas); puntua por reaccion media (menor = mejor). La fila 2 de la app aun es '?' (a/b): se fija a la 1a.
+       Limite (cuadrados pulsados) no se ofrece aqui: su puntuacion es por aciertos. Los valores van como CADENAS (la app guarda total 'x1'/'x2'/'x4'). */
     dims:[
-      { key:'total', label:'Cuadrados', def:'25', options:[ {value:'25',label:'25'},{value:'50',label:'50'},{value:'100',label:'100'} ] }
+      { key:'total', label:'Vueltas', def:'x1', options:[ {value:'x1',label:'x1'},{value:'x2',label:'x2'},{value:'x4',label:'x4'} ] }
     ],
-    dimLabel:function(v){ return 'Normal, '+(v.total||'25'); },
-    buildMatch:function(v){ return { mode:'normal', stim:'a', total:String(v.total||'25') }; } },
+    dimLabel:function(v){ return 'Normal, '+(v.total||'x1'); },
+    buildMatch:function(v){ return { mode:'normal', stim:'a', total:String(v.total||'x1') }; } },
   { slug:'rds-processing2-test', name:'Processing 2',
     collection:'scores_processing2', match:{mode:'normal', stim:'estatico', total:25},
     metric:'avg', better:'lower', unidad:'ms', inClasif:true,
