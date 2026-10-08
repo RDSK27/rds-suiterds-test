@@ -277,7 +277,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v50</div>
+    <div class="app-ver">v51</div>
   </footer>
 
 </div>
@@ -501,6 +501,7 @@ var APPS=[
   { slug:'rds-perception-test',       name:'Perception',        icon:'icons/rds-perception-test.png' },
   { slug:'rds-ballcoordination-test', name:'Ball Coordination', icon:'icons/rds-ballcoordination-test.png' },
   { slug:'rds-lightsreaction-test',   name:'Lights Speed',      icon:'icons/rds-lightsreaction-test.png' },
+  { slug:'rds-squares-test',          name:'Squares Reaction',  icon:'icons/rds-squares-test.png' },
   { slug:'rds-memorycards-test',      name:'Memory Cards',      icon:'icons/rds-memorycards-test.png' },
   { slug:'rds-reactiontrial-test',    name:'Reaction Trial',    icon:'icons/rds-reactiontrial-test.png' },
   { slug:'rds-circuit-test',          name:'Circuit Reaction',  icon:'icons/rds-circuit-test.png' },
@@ -846,7 +847,7 @@ var APP_ADAPTERS=[
     } },
   { slug:'rds-squares-test', name:'Squares Reaction',
     collection:'scores_squares', match:{mode:'normal', stim:'a', total:'x1'},
-    metric:'avg', better:'lower', unidad:'ms', inClasif:false,   /* false MIENTRAS la app no este en la pestana Apps (si no sumaria puntos sin verse); ponerlo a true al mostrarla (probado: Normal 25 puntua bien) */
+    metric:'avg', better:'lower', unidad:'ms', inClasif:true,   /* v51: Squares ya esta en la pestana Apps y puntua en la Clasificacion */
     /* Clasificacion (2026-10-08): Normal, x1 por defecto (v50: la app usa 16 cuadrados y x1/x2/x4 = 1/2/4 vueltas); puntua por reaccion media (menor = mejor). La fila 2 de la app aun es '?' (a/b): se fija a la 1a.
        Limite (cuadrados pulsados) no se ofrece aqui: su puntuacion es por aciertos. Los valores van como CADENAS (la app guarda total 'x1'/'x2'/'x4'). */
     dims:[
