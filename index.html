@@ -277,7 +277,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v45</div>
+    <div class="app-ver">v46</div>
   </footer>
 
 </div>
@@ -843,6 +843,24 @@ var APP_ADAPTERS=[
     },
     buildMatch:function(v){
       return { mode:v.mode||'normal', stim:v.stim||'cambia', total:parseInt(v.total||'15',10) };
+    } },
+  { slug:'rds-processing2-test', name:'Processing 2',
+    collection:'scores_processing2', match:{mode:'normal', stim:'estatico', total:25},
+    metric:'avg', better:'lower', unidad:'ms', inClasif:true,
+    /* Clasificacion (2026-10-08, pedido expreso): Normal, Estatico, 25 por defecto. Solo se ofrece la version ESTATICA (puntua por reaccion media):
+       el Dinamico puntua por estimulos acertados (+ media de desempate) y no encaja en la metrica 'avg'. */
+    dims:[
+      { key:'mode', label:'Modo', def:'normal', options:[
+          {value:'normal',label:'Normal'},{value:'extremo',label:'Extremo'},{value:'limite',label:'Límite'} ] },
+      { key:'total', label:'Estímulos', def:'25', options:[
+          {value:'25',label:'25'},{value:'50',label:'50'},{value:'100',label:'100'} ] }
+    ],
+    dimLabel:function(v){
+      var modeLbl={normal:'Normal',extremo:'Extremo',limite:'Límite'}[v.mode||'normal'];
+      return modeLbl+', Estático, '+(v.total||'25');
+    },
+    buildMatch:function(v){
+      return { mode:v.mode||'normal', stim:'estatico', total:parseInt(v.total||'25',10) };
     } },
   { slug:'rds-rallymemory-test', name:'Rally Memory',
     collection:'scores_rallymemory', match:{mode:'normal', stim:'normal', total:5},
