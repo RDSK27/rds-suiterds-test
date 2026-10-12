@@ -162,6 +162,7 @@ if('serviceWorker' in navigator){
   .ct-toggle{display:flex;gap:8px;margin:0 0 10px;}
   .ct-toggle button{flex:1;padding:8px 6px;border:2px solid var(--borde);border-radius:6px;background:#fff;font-weight:800;font-size:11.5px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;color:var(--negro);}
   .ct-toggle button.on{background:#111;color:#fff;border-color:#111;}
+  #clasifTog #clSportBtn{flex:1.1;margin-left:6px;}   /* v53: Puntos | Puestos (excluyentes) + Deportes (interruptor) */
   table.champ-table th.sortable{cursor:pointer;}
   table.champ-table th.sorted{background:var(--rojo);color:#fff;}
   table.champ-table td.sorted{background:#fdecea !important;}
@@ -257,7 +258,7 @@ if('serviceWorker' in navigator){
 
     <!-- ================= CLASIFICACION ================= -->
     <section class="panel" id="panel-clasificacion">
-      <div class="section-title">Clasificaci&#243;n general</div>
+      <div class="ct-toggle" id="clasifTog"><button data-cm="pts">Puntos</button><button data-cm="pos">Puestos</button><button data-cm="dep" id="clSportBtn">Deportes</button></div>
       <div class="pend-banner" id="pendBannerC"></div>
       <div id="clasifBody"></div>
     </section>
@@ -278,7 +279,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v52</div>
+    <div class="app-ver">v53</div>
   </footer>
 
 </div>
@@ -1194,7 +1195,7 @@ function clasifSaveCache(slug,docs,col){
 }
 function clasifLoadCache(slug,col){ try{ var c=JSON.parse(localStorage.getItem(CLASIF_CACHE_PREFIX+slug)||'null'); return (c && c.col===col) ? c : null; }catch(e){ return null; } }
 async function computeClasificacion(liveDocs){
-  var totals={}, det={};
+  var totals={}, det={}, tables=[];
   var lista=APP_ADAPTERS.filter(function(a){ return a.inClasif; });
   var online=navigator.onLine;
   /* En paralelo (no una app detras de otra): si alguna tarda o se atasca,
@@ -1218,6 +1219,7 @@ async function computeClasificacion(liveDocs){
     docs=clasifMerge(cfg, docs, clasifLocalDocs(cfg));
     if(cfg.clasifFilter) docs=docs.filter(cfg.clasifFilter);
     var ranked=dedupeBest(docs, cfg.clasifMetric||cfg.metric, cfg.better);
+    tables.push({ cfg:cfg, ranked:ranked });   // v53: tabla completa de cada app (para Puestos)
     ranked.forEach(function(r, idx){   // posicion real de cada persona en esta tabla (aunque no puntue)
       (det[r.name]||(det[r.name]={}))[cfg.slug]={ pos:idx+1, val:r.val, doc:r.doc, unidad:cfg.unidad, fmt:cfg.clasifFmt };
     });
@@ -1230,7 +1232,8 @@ async function computeClasificacion(liveDocs){
   });
   var list=Object.keys(totals).map(function(k){ var tt=totals[k]; tt.det=det[k]||{}; return tt; });
   list.sort(function(a,b){ return b.points-a.points; });
-  return { list:list, meta:meta };
+  clasifLastRes={ list:list, meta:meta, tables:tables };
+  return clasifLastRes;
 }
 /* Pie de diagnostico (2026-10-01): version de SuiteRDS, hora del calculo y de donde salen los datos, para poder comparar dos aparatos. */
 function clasifFooterHtml(meta){
@@ -1313,8 +1316,87 @@ function clasifDetalleHtml(row){
     return '<div class="clasif-det-line"><span class="cdl-app">'+a.name+'</span><span class="cdl-res">'+res+'</span></div>';
   }).join('');
 }
+/* ---------- v53: Clasificacion por PUESTOS y por DEPORTES (2026-10-12, pedido de Roberto) ----------
+   Puntos (como siempre) | Puestos: en cada app se ordena a TODOS los que tienen marca (empates a resultado comparten el puesto mas alto, como en
+   Campeonatos); se suman los puestos y gana quien menos suma. Quien no tiene marca en una app puntua el puesto del ULTIMO que si la tiene
+   (CLAS_MISS_PLUS=0; Campeonatos usa participantes+1: para igualarlo, ponerlo a 1). Deportes (interruptor): se agrupa por deporte (parte
+   tras el guion del nombre, p.ej. LEO-TRI -> TRI), se suman los 3 mejores de cada deporte (Puntos: mas puntos; Puestos: menos suma) y se ordenan
+   los deportes; los que no llegan a 3 deportistas van al final marcados n/3. */
+var CLAS_MISS_PLUS=0, CLAS_TOP=3, clasifLastRes=null;
+var CL={ m:'pts', sp:false };
+try{ var _cl=JSON.parse(localStorage.getItem('suiterds_cl')||'null'); if(_cl){ CL.m=(_cl.m==='pos')?'pos':'pts'; CL.sp=!!_cl.sp; } }catch(e){}
+function clasifSportOf(name){ var i=(name||'').indexOf('-'); return i>0 ? name.slice(i+1) : 'OTR'; }
+function clasifSportLabel(code){ var o=SPORT_OPTIONS.filter(function(x){ return x[0]===code; })[0]; return o ? o[1] : code; }
+function clasifPuestosRows(tables){
+  var cols=[], byName={};
+  tables.forEach(function(t){
+    var N=t.ranked.length; if(!N) return;
+    var ci=cols.length, prevVal=null, prevPos=0;
+    cols.push({ cfg:t.cfg, last:0 });
+    t.ranked.forEach(function(r, idx){
+      var pos=(prevVal!==null && r.val===prevVal) ? prevPos : idx+1;
+      prevVal=r.val; prevPos=pos; cols[ci].last=pos;
+      var row=byName[r.name]||(byName[r.name]={ name:r.name, cells:[] });
+      row.cells[ci]={ pos:pos, val:r.val, doc:r.doc, part:true };
+    });
+  });
+  var rows=Object.keys(byName).map(function(k){ return byName[k]; });
+  rows.forEach(function(row){
+    var total=0, n=0;
+    cols.forEach(function(col, ci){
+      if(!row.cells[ci]) row.cells[ci]={ pos:col.last+CLAS_MISS_PLUS, part:false }; else n++;
+      total+=row.cells[ci].pos;
+    });
+    row.total=total; row.nPart=n;
+  });
+  rows.sort(function(a,b){ return a.total-b.total || b.nPart-a.nPart || (a.name<b.name?-1:1); });
+  rows.forEach(function(row){
+    row.det=cols.map(function(col, ci){
+      var c=row.cells[ci], a=APPS.filter(function(x){ return x.slug===col.cfg.slug; })[0];
+      var txt=c.part ? (pad2p(c.pos)+'- '+(col.cfg.clasifFmt ? col.cfg.clasifFmt(c.doc) : fmtVal(c.val,{unidad:col.cfg.unidad}))) : (pad2p(c.pos)+'- sin marca');
+      return '<div class="clasif-det-line"><span class="cdl-app">'+(a?a.name:col.cfg.name)+'</span><span class="cdl-res"'+(c.part?'':' style="color:#aaa"')+'>'+txt+'</span></div>';
+    }).join('');
+  });
+  return rows.map(function(r){ return { key:r.name, name:r.name, score:r.total, det:r.det }; });
+}
+function clasifViewRows(list){
+  var indiv = (CL.m==='pos')
+    ? clasifPuestosRows(clasifLastRes ? clasifLastRes.tables : [])
+    : list.map(function(row){ return { key:row.name, name:row.name, score:row.points, det:clasifDetalleHtml(row) }; });
+  if(!CL.sp) return indiv;
+  var groups={}, order=[];
+  indiv.forEach(function(r){ var sp=clasifSportOf(r.name); if(!groups[sp]){ groups[sp]=[]; order.push(sp); } groups[sp].push(r); });   // indiv ya viene ordenado de mejor a peor
+  var rows=order.map(function(sp){
+    var top=groups[sp].slice(0,CLAS_TOP), sum=0;
+    top.forEach(function(r){ sum+=r.score; });
+    return { key:sp, name:clasifSportLabel(sp)+(top.length<CLAS_TOP ? ' \u00b7 '+top.length+'/'+CLAS_TOP : ''), score:sum, full:top.length>=CLAS_TOP,
+      det:top.map(function(r){ return '<div class="clasif-det-line"><span class="cdl-app">'+esc(r.name)+'</span><span class="cdl-res">'+r.score+'</span></div>'; }).join('') };
+  });
+  rows.sort(function(a,b){ return (b.full-a.full) || (CL.m==='pos' ? a.score-b.score : b.score-a.score); });
+  return rows;
+}
+function clasifSyncTog(){
+  var t=$('clasifTog'); if(!t) return;
+  Array.prototype.forEach.call(t.querySelectorAll('button'), function(b){
+    var k=b.getAttribute('data-cm');
+    b.classList.toggle('on', k==='dep' ? CL.sp : k===CL.m);
+  });
+}
+(function(){
+  var t=$('clasifTog'); if(!t) return;
+  t.addEventListener('click', function(e){
+    var b=e.target.closest('button'); if(!b) return;
+    var k=b.getAttribute('data-cm');
+    if(k==='dep') CL.sp=!CL.sp; else CL.m=k;
+    try{ localStorage.setItem('suiterds_cl', JSON.stringify(CL)); }catch(e2){}
+    clasifSyncTog();
+    if(clasifLastRes) paintClasificacion(clasifLastRes.list, clasifLastRes.meta);
+  });
+  clasifSyncTog();
+})();
 function paintClasificacion(list, meta){
   var host=$('clasifBody');
+  clasifSyncTog();
   var openNames={}; Array.prototype.forEach.call(host.querySelectorAll('.clasif-row.open .clasif-name'), function(n){ openNames[n.textContent]=1; });
   if(!host.dataset.clasifBound){
     host.dataset.clasifBound='1';
@@ -1326,16 +1408,17 @@ function paintClasificacion(list, meta){
       if(row) row.classList.toggle('open');
     });
   }
-  if(!list.length){ host.innerHTML=clasifNoteHtml(meta)+'<div class="hint">'+(meta&&meta.offline?'Sin conexi\u00f3n y sin datos guardados todav\u00eda: abre la clasificaci\u00f3n con conexi\u00f3n al menos una vez.':'Todav\u00eda no hay marcas guardadas en los rankings oficiales.')+'</div>'; return; }
+  var rows=clasifViewRows(list);
+  if(!rows.length){ host.innerHTML=clasifNoteHtml(meta)+'<div class="hint">'+(meta&&meta.offline?'Sin conexi\u00f3n y sin datos guardados todav\u00eda: abre la clasificaci\u00f3n con conexi\u00f3n al menos una vez.':'Todav\u00eda no hay marcas guardadas en los rankings oficiales.')+'</div>'; return; }
   var html=clasifNoteHtml(meta)+'<div class="clasif-list">';
   var me=getMe();
-  list.forEach(function(row, idx){
+  rows.forEach(function(row, idx){
     var medal = idx===0?' gold':(idx===1?' silver':(idx===2?' bronze':''));
-    var detalle = clasifDetalleHtml(row);
-    html += '<div class="clasif-row'+(me && row.name===me?' is-me':'')+'">'
+    var mine = me && (CL.sp ? clasifSportOf(me)===row.key : row.key===me);
+    html += '<div class="clasif-row'+(mine?' is-me':'')+'">'
       + '<div class="clasif-pos'+medal+'">'+(idx+1)+'</div>'
-      + '<div class="clasif-mid"><div class="clasif-name">'+esc(row.name)+'</div><div class="clasif-detalle">'+detalle+'</div></div>'
-      + '<div class="clasif-pts">'+row.points+'</div>'
+      + '<div class="clasif-mid"><div class="clasif-name">'+esc(row.name)+'</div><div class="clasif-detalle">'+row.det+'</div></div>'
+      + '<div class="clasif-pts">'+row.score+'</div>'
       + '</div>';
   });
   html+='</div>'+clasifFooterHtml(meta)+'<button class="add-prueba" id="btnRefreshClasif" style="margin-top:14px;">Actualizar</button>';
