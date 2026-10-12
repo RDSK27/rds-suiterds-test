@@ -279,7 +279,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v55</div>
+    <div class="app-ver">v56</div>
   </footer>
 
 </div>
@@ -422,7 +422,7 @@ window.hubLoadChamps=async function(){
 var STATIC_BASE=(location.hostname==='localhost'||location.hostname==='127.0.0.1') ? '/rds-rankings-data/data/' : 'https://rdsk27.github.io/rds-rankings-data/data/';
 var STATIC_COLS=['scores_ballcoordination','scores_circuit','scores_gimnasia','scores_lights','scores_memorycards','scores_perception','scores_processing','scores_processing2','scores_rallymemory','scores_reactionkarate','scores_reactiontenis','scores_reactiontrial','scores_squares','scores_reaction_10_normal_press_nosound','scores_reaction_10_normal_press_sound'];
 function mkInc(COL,TSF,KEY,STRIP,MASK){
-  var HAS_JSON=STATIC_COLS.indexOf(COL)>=0;
+  var HAS_JSON=(STATIC_COLS.indexOf(COL)>=0 || /^scores_reaction_\d+_/.test(COL));   // v56: cualquier combinacion de Reaction (Campeonatos); si no hay JSON, cae a Firestore
   var WEEK=7*864e5, AGE=HAS_JSON?12*36e5:WEEK, MARGIN=(HAS_JSON?1:6)*36e5, c={docs:{},full:0,ts:0}, loaded=false;
   function load(){ if(loaded) return; loaded=true; try{ var o=JSON.parse(localStorage.getItem(KEY)||'null'); if(o&&o.docs&&typeof o.docs==='object') c=o; }catch(e){} }
   function save(){ try{ localStorage.setItem(KEY,JSON.stringify(c)); }catch(e){} }
