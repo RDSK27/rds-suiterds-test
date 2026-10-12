@@ -279,7 +279,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v53</div>
+    <div class="app-ver">v54</div>
   </footer>
 
 </div>
@@ -1319,10 +1319,10 @@ function clasifDetalleHtml(row){
 /* ---------- v53: Clasificacion por PUESTOS y por DEPORTES (2026-10-12, pedido de Roberto) ----------
    Puntos (como siempre) | Puestos: en cada app se ordena a TODOS los que tienen marca (empates a resultado comparten el puesto mas alto, como en
    Campeonatos); se suman los puestos y gana quien menos suma. Quien no tiene marca en una app puntua el puesto del ULTIMO que si la tiene
-   (CLAS_MISS_PLUS=0; Campeonatos usa participantes+1: para igualarlo, ponerlo a 1). Deportes (interruptor): se agrupa por deporte (parte
+   (CLAS_MISS_PLUS=1: puesto del ultimo + 1, igual que Campeonatos; con 0 puntuaria el puesto del ultimo). Deportes (interruptor): se agrupa por deporte (parte
    tras el guion del nombre, p.ej. LEO-TRI -> TRI), se suman los 3 mejores de cada deporte (Puntos: mas puntos; Puestos: menos suma) y se ordenan
-   los deportes; los que no llegan a 3 deportistas van al final marcados n/3. */
-var CLAS_MISS_PLUS=0, CLAS_TOP=3, clasifLastRes=null;
+   los deportes. Si un deporte tiene menos de 3 deportistas: con 1 se triplica su puntuacion; con 2 se duplica la del peor (decision de Roberto). */
+var CLAS_MISS_PLUS=1, CLAS_TOP=3, clasifLastRes=null;
 var CL={ m:'pts', sp:false };
 try{ var _cl=JSON.parse(localStorage.getItem('suiterds_cl')||'null'); if(_cl){ CL.m=(_cl.m==='pos')?'pos':'pts'; CL.sp=!!_cl.sp; } }catch(e){}
 function clasifSportOf(name){ var i=(name||'').indexOf('-'); return i>0 ? name.slice(i+1) : 'OTR'; }
@@ -1367,12 +1367,13 @@ function clasifViewRows(list){
   var groups={}, order=[];
   indiv.forEach(function(r){ var sp=clasifSportOf(r.name); if(!groups[sp]){ groups[sp]=[]; order.push(sp); } groups[sp].push(r); });   // indiv ya viene ordenado de mejor a peor
   var rows=order.map(function(sp){
-    var top=groups[sp].slice(0,CLAS_TOP), sum=0;
-    top.forEach(function(r){ sum+=r.score; });
-    return { key:sp, name:clasifSportLabel(sp)+(top.length<CLAS_TOP ? ' \u00b7 '+top.length+'/'+CLAS_TOP : ''), score:sum, full:top.length>=CLAS_TOP,
-      det:top.map(function(r){ return '<div class="clasif-det-line"><span class="cdl-app">'+esc(r.name)+'</span><span class="cdl-res">'+r.score+'</span></div>'; }).join('') };
+    var top=groups[sp].slice(0,CLAS_TOP), real=top.length, shown=top.slice(), sum=0;
+    while(shown.length<CLAS_TOP){ shown.push(top[top.length-1]); }   // faltan deportistas: se repite el peor (1 -> x3; 2 -> el peor x2)
+    shown.forEach(function(r){ sum+=r.score; });
+    return { key:sp, name:clasifSportLabel(sp), score:sum,
+      det:shown.map(function(r, i){ return '<div class="clasif-det-line"><span class="cdl-app">'+esc(r.name)+(i>=real ? ' (repetido)' : '')+'</span><span class="cdl-res"'+(i>=real?' style="color:#aaa"':'')+'>'+r.score+'</span></div>'; }).join('') };
   });
-  rows.sort(function(a,b){ return (b.full-a.full) || (CL.m==='pos' ? a.score-b.score : b.score-a.score); });
+  rows.sort(function(a,b){ return CL.m==='pos' ? a.score-b.score : b.score-a.score; });
   return rows;
 }
 function clasifSyncTog(){
