@@ -1,5 +1,5 @@
 /* SuiteRDS - Service Worker */
-var CACHE = 'suiterds-v54';
+var CACHE = 'suiterds-v55';
 var ASSETS = [
   './',
   './index.html',
@@ -54,6 +54,7 @@ self.addEventListener('fetch', function(e){
   if(req.method !== 'GET'){ return; }
   var url = new URL(req.url);
   var sameOrigin = (url.origin === self.location.origin);
+  if(url.pathname.indexOf('/rds-rankings-data/') !== -1){ return; }   // JSON de rankings: siempre de la red (si no, el cache-first lo dejaria viejo)
 
   // NAVEGACION (HTML): network-first -> siempre la ultima version si hay red,
   // con la cache como respaldo offline. {cache:'no-store'} es imprescindible:
