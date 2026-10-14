@@ -893,24 +893,24 @@ var APP_ADAPTERS=[
     dimLabel:function(v){ return 'Normal, '+(v.total||'x1'); },
     buildMatch:function(v){ return { mode:'normal', stim:'a', total:String(v.total||'x1') }; } },
   { slug:'rds-perception2-test', name:'Perception 2',
-    collection:'scores_perception2', match:{mode:'normal', stim:'a', total:'15'},
+    collection:'scores_perception2', match:{mode:'normal', stim:'a', total:'10'},
     metric:'avg', better:'lower', unidad:'ms', inClasif:true,
-    /* Clasificacion (2026-10-14): Normal, Numeros/Letras ('a'), 15 por defecto; puntua por reaccion media (menor = mejor) del 2o numero de la pareja.
-       Limite (parejas encontradas) no se ofrece aqui: su puntuacion es por aciertos. La app guarda total como CADENA ('15'/'25'/'50'). Stim: a = Numeros/Letras, b = Simbolos. */
+    /* Clasificacion (2026-10-14): Normal, Numeros/Letras ('a'), 10 por defecto; puntua por reaccion media (menor = mejor) del 2o numero de la pareja.
+       Limite (parejas encontradas) no se ofrece aqui: su puntuacion es por aciertos. La app guarda total como CADENA ('10'/'25'/'50'). Stim: a = Numeros/Letras, b = Simbolos. */
     dims:[
       { key:'mode', label:'Modo', def:'normal', options:[
           {value:'normal',label:'Normal'},{value:'extremo',label:'Extremo'} ] },
       { key:'stim', label:'Teclas', def:'a', options:[
           {value:'a',label:'Números/Letras'},{value:'b',label:'Símbolos'} ] },
-      { key:'total', label:'Teclados', def:'15', options:[
-          {value:'15',label:'15'},{value:'25',label:'25'},{value:'50',label:'50'} ] }
+      { key:'total', label:'Teclados', def:'10', options:[
+          {value:'10',label:'10'},{value:'25',label:'25'},{value:'50',label:'50'} ] }
     ],
     dimLabel:function(v){
       var modeLbl={normal:'Normal',extremo:'Extremo'}[v.mode||'normal'];
       var stimLbl={a:'Números/Letras',b:'Símbolos'}[v.stim||'a'];
-      return modeLbl+', '+stimLbl+', '+(v.total||'15');
+      return modeLbl+', '+stimLbl+', '+(v.total||'10');
     },
-    buildMatch:function(v){ return { mode:v.mode||'normal', stim:v.stim||'a', total:String(v.total||'15') }; } },
+    buildMatch:function(v){ return { mode:v.mode||'normal', stim:v.stim||'a', total:String(v.total||'10') }; } },
   { slug:'rds-processing2-test', name:'Processing 2',
     collection:'scores_processing2', match:{mode:'normal', stim:'estatico', total:25},
     metric:'avg', better:'lower', unidad:'ms', inClasif:true,
