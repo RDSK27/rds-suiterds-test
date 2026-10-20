@@ -311,7 +311,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v60</div>
+    <div class="app-ver">v61</div>
   </footer>
 
 </div>
@@ -1144,11 +1144,12 @@ var APP_ADAPTERS=[
        la parada media en ms (menos = mejor): valor compuesto, mayor = mejor. */
     clasifMetric:function(d){ return (d.ensayos||0)*100000-(d.avg||0); },
     clasifFmt:function(d){ return (d.ensayos||0)+' pts \u00b7 '+(d.avg||0)+' ms'; },
+    /* Campeonatos (v61): los 3 modos de la app (Normal, Extremo, Limite); Limite acaba al primer ejercicio con menos de 90 y puntua los anteriores. La Clasificacion/Perfil usan solo Normal (match de arriba). */
     dims:[
-      { key:'mode', label:'Modo', def:'normal', options:[ {value:'normal',label:'Normal'} ] }
+      { key:'mode', label:'Modo', def:'normal', options:[ {value:'normal',label:'Normal'},{value:'extremo',label:'Extremo'},{value:'limite',label:'Límite'} ] }
     ],
-    dimLabel:function(v){ return 'Normal'; },
-    buildMatch:function(v){ return { mode:'normal', stim:'a', total:'a' }; } },
+    dimLabel:function(v){ return {normal:'Normal',extremo:'Extremo',limite:'Límite'}[v.mode||'normal']; },
+    buildMatch:function(v){ return { mode:v.mode||'normal', stim:'a', total:'a' }; } },
   { slug:'rds-reactionkarate-test', name:'Reaction Karate',
     collection:'scores_reactionkarate', match:{s1:'def', s2:'10', s3:'paus'},
     metric:'avg', better:'lower', unidad:'ms', inClasif:true,
