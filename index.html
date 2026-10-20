@@ -88,6 +88,30 @@ if('serviceWorker' in navigator){
     text-shadow:0 1px 2px rgba(0,0,0,0.7);
   }
   .tabs button:last-child{border-right:0;}
+  /* ---------- Perfil (v59) ---------- */
+  .pf-who{display:flex;gap:8px;margin:0 0 10px;}
+  .pf-who select{flex:1;min-width:0;height:36px;border:2px solid var(--borde);border-radius:6px;font-size:13px;font-family:inherit;padding:0 6px;background:#fff;color:var(--negro);}
+  .pf-who button{flex:none;height:36px;padding:0 12px;border:0;border-radius:6px;background:var(--rojo);color:#fff;font-weight:800;font-size:11px;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;}
+  .pf-general{display:flex;align-items:center;gap:12px;border:2px solid var(--borde);border-radius:8px;padding:10px 12px;margin:0 0 8px;}
+  .pf-general .pf-num{flex:none;width:62px;height:62px;border-radius:50%;background:#111;color:#fff;font-weight:900;font-size:24px;display:flex;align-items:center;justify-content:center;border:3px solid var(--rojo);}
+  .pf-general.inc .pf-num{background:#bbb;border-color:#999;font-size:20px;}
+  .pf-general .pf-txt{font-size:12px;color:#444;line-height:1.35;}
+  .pf-general .pf-txt b{color:var(--negro);font-size:13px;}
+  .perfil-radar{width:100%;max-width:340px;display:block;margin:0 auto 6px;}
+  .pf-area{border:2px solid var(--borde);border-radius:8px;padding:8px 10px;margin:0 0 6px;cursor:pointer;}
+  .pf-area-top{display:flex;align-items:center;gap:8px;}
+  .pf-name{flex:1;min-width:0;font-weight:800;font-size:13px;color:var(--negro);}
+  .pf-name small{display:block;font-weight:600;font-size:10.5px;color:#777;}
+  .pf-score{flex:none;font-weight:900;font-size:20px;color:var(--rojo);min-width:34px;text-align:right;}
+  .pf-score.none{color:#aaa;font-size:14px;}
+  .pf-bar{height:7px;background:var(--seg);border:1px solid var(--borde);margin-top:6px;}
+  .pf-bar i{display:block;height:100%;background:var(--rojo);}
+  .pf-det{display:none;margin-top:8px;font-size:11.5px;color:#555;line-height:1.5;}
+  .pf-area.open .pf-det{display:block;}
+  .pf-det .l{display:flex;justify-content:space-between;gap:8px;}
+  .pf-det .l.no{color:#aaa;}
+  .pf-note{font-size:10.5px;color:#888;line-height:1.4;margin:8px 2px 0;}
+  .tabs button{font-size:11px;letter-spacing:0.2px;}   /* v59: 4 pestanas */
   .tabs button.sel{background:var(--rojo);color:#fff;text-shadow:none;}
 
   main{flex:1;min-height:0;overflow-y:auto;padding:14px 16px 20px;background:#fff;}
@@ -241,8 +265,9 @@ if('serviceWorker' in navigator){
 
   <div class="tabs" id="tabs">
     <button class="sel" data-tab="rankings">Apps</button>
-    <button data-tab="clasificacion">Clasificaci&#243;n</button>
-    <button data-tab="campeonatos">Campeonatos</button>
+    <button data-tab="clasificacion">Clasif.</button>
+    <button data-tab="campeonatos">Campeon.</button>
+    <button data-tab="perfil">Perfil</button>
   </div>
 
   <div id="meBar"></div>
@@ -264,6 +289,13 @@ if('serviceWorker' in navigator){
     </section>
 
     <!-- ================= CAMPEONATOS ================= -->
+    <!-- ================= PERFIL ================= -->
+    <section class="panel" id="panel-perfil">
+      <div class="section-title">Perfil cognitivo-deportivo</div>
+      <div class="pf-who"><select id="perfilWho"></select><button id="btnPerfilRef" type="button">Actualizar</button></div>
+      <div id="perfilBody"></div>
+    </section>
+
     <section class="panel" id="panel-campeonatos">
       <div id="champForm"></div>
       <div id="champList"></div>
@@ -279,7 +311,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v58</div>
+    <div class="app-ver">v59</div>
   </footer>
 
 </div>
@@ -583,7 +615,7 @@ $('tabs').addEventListener('click', function(e){
   var b=e.target.closest('button'); if(!b) return;
   var id=b.getAttribute('data-tab');
   showTab(id);
-  if(id==='clasificacion') renderClasificacion(); if(id==='campeonatos') loadChamps();
+  if(id==='clasificacion') renderClasificacion(); if(id==='campeonatos') loadChamps(); if(id==='perfil') renderPerfil();
 });
 
 /* ---------- Rankings: rejilla de botones ---------- */
@@ -1260,7 +1292,7 @@ async function computeClasificacion(liveDocs){
     docs=clasifMerge(cfg, docs, clasifLocalDocs(cfg));
     if(cfg.clasifFilter) docs=docs.filter(cfg.clasifFilter);
     var ranked=dedupeBest(docs, cfg.clasifMetric||cfg.metric, cfg.better);
-    tables.push({ cfg:cfg, ranked:ranked });   // v53: tabla completa de cada app (para Puestos)
+    tables.push({ cfg:cfg, ranked:ranked, docs:docs });   // v53: tabla completa de cada app (para Puestos); v59: + todos los intentos (para el Perfil)
     ranked.forEach(function(r, idx){   // posicion real de cada persona en esta tabla (aunque no puntue)
       (det[r.name]||(det[r.name]={}))[cfg.slug]={ pos:idx+1, val:r.val, doc:r.doc, unidad:cfg.unidad, fmt:cfg.clasifFmt };
     });
@@ -1468,6 +1500,127 @@ function paintClasificacion(list, meta){
   Array.prototype.forEach.call(host.querySelectorAll('.clasif-row'), function(r){ var n=r.querySelector('.clasif-name'); if(n && openNames[n.textContent]) r.classList.add('open'); });
   $('btnRefreshClasif').addEventListener('click', renderClasificacion);
 }
+
+/* ---------- PERFIL cognitivo-deportivo (2026-10-20, pedido de Roberto) ----------
+   Posicion RELATIVA del deportista frente a TODOS los de la suite en 5 areas. Para cada app se toma su prueba oficial (la misma que cuenta en la Clasificacion) y, por persona,
+   la MEDIA DE SUS 3 MEJORES INTENTOS (PERFIL_TOP); con eso se calcula el PERCENTIL (% de personas a las que supera; empates a la mitad). Cada area = media ponderada de los
+   percentiles de las apps que la componen y que el deportista HA HECHO (con una app ya hay nota; las pendientes no cuentan; al hacerlas se suman). La nota general solo existe
+   con las 5 areas con nota (media de las 5). Una app puede estar en varias areas con distinto peso. Orientativo: no es un test psicometrico validado. */
+var PERFIL_TOP=3, PERFIL_MIN_N=10;
+var PERFIL_AREAS=[
+  { key:'reaccion',      label:'Reacción',                  short:'Reacción',      apps:{ 'rds-reaction-test':1, 'rds-lightsreaction-test':1, 'rds-squares-test':1, 'rds-reactionkarate-test':0.4 } },
+  { key:'percepcion',    label:'Percepción',                short:'Percepción',    apps:{ 'rds-perception-test':1, 'rds-perception2-test':1 } },
+  { key:'procesamiento', label:'Procesamiento y decisión',  short:'Procesamiento', apps:{ 'rds-processing-test':1, 'rds-processing2-test':1, 'rds-reactiontrial-test':1 } },
+  { key:'memoria',       label:'Memoria',                   short:'Memoria',       apps:{ 'rds-memorycards-test':1 } },
+  { key:'coordinacion',  label:'Coordinación óculo-manual', short:'Coordinación',  apps:{ 'rds-ballcoordination-test':1, 'rds-reactiontenis-test':1, 'rds-reactionkarate-test':1, 'rds-reactiontrial-test':0.5, 'rds-circuit-test':0.5, 'rds-squares-test':0.4, 'rds-lightsreaction-test':0.4 } }
+];
+function perfilMarks(cfg, docs){   /* nombre -> { val: media de sus PERFIL_TOP mejores intentos, n: intentos usados } */
+  var mt=cfg.clasifMetric||cfg.metric, by={}, out={};
+  (docs||[]).forEach(function(d){
+    var v=(typeof mt==='function') ? mt(d) : d[mt]; if(v==null || !isFinite(v)) return;
+    var nm=(d.name||'').trim().toUpperCase(); if(!nm) return;
+    (by[nm]||(by[nm]=[])).push(v);
+  });
+  Object.keys(by).forEach(function(nm){
+    var a=by[nm].sort(function(x,y){ return cfg.better==='lower' ? x-y : y-x; }).slice(0,PERFIL_TOP), sum=0;
+    a.forEach(function(v){ sum+=v; });
+    out[nm]={ val:sum/a.length, n:a.length };
+  });
+  return out;
+}
+function perfilPercentile(marks, name, better){
+  var names=Object.keys(marks), N=names.length, x=marks[name].val, worse=0, eq=0;
+  names.forEach(function(n){ var v=marks[n].val; if(v===x) eq++; else if(better==='lower' ? v>x : v<x) worse++; });
+  return N ? 100*(worse+0.5*eq)/N : 0;
+}
+function perfilApps(res){   /* slug -> { cfg, marks, N } a partir de las tablas de la Clasificacion */
+  var apps={};
+  (res.tables||[]).forEach(function(t){ var m=perfilMarks(t.cfg, t.docs); apps[t.cfg.slug]={ cfg:t.cfg, marks:m, N:Object.keys(m).length }; });
+  return apps;
+}
+function perfilAppName(slug){ var a=APPS.filter(function(x){ return x.slug===slug; })[0]; return a ? a.name : slug; }
+function perfilFor(apps, name){
+  var areas=PERFIL_AREAS.map(function(ar){
+    var items=[], sw=0, sp=0;
+    Object.keys(ar.apps).forEach(function(slug){
+      var w=ar.apps[slug], a=apps[slug]; if(!a) return;
+      var m=a.marks[name];
+      if(!m){ items.push({ slug:slug, w:w, done:false }); return; }
+      var p=perfilPercentile(a.marks, name, a.cfg.better);
+      items.push({ slug:slug, w:w, done:true, p:p, val:m.val, n:m.n, N:a.N, cfg:a.cfg });
+      sw+=w; sp+=w*p;
+    });
+    return { ar:ar, items:items, score: sw>0 ? sp/sw : null, done:items.filter(function(i){ return i.done; }).length };
+  });
+  var complete=areas.every(function(a){ return a.score!=null; });
+  var general=null; if(complete){ general=0; areas.forEach(function(a){ general+=a.score; }); general/=areas.length; }
+  return { areas:areas, complete:complete, general:general };
+}
+function perfilRadarSvg(areas){
+  var W=340,H=310,cx=170,cy=152,R=82,n=areas.length,i,r,s='<svg viewBox="0 0 '+W+' '+H+'" class="perfil-radar">';
+  function pt(i,rad){ var a=-Math.PI/2+i*2*Math.PI/n; return [cx+rad*Math.cos(a), cy+rad*Math.sin(a)]; }
+  [25,50,75,100].forEach(function(pc){
+    var p=[]; for(i=0;i<n;i++){ var q=pt(i,R*pc/100); p.push(q[0].toFixed(1)+','+q[1].toFixed(1)); }
+    s+='<polygon points="'+p.join(' ')+'" fill="'+(pc===100?'#fafafa':'none')+'" stroke="'+(pc===50?'#9a9a9a':'#d4d4d4')+'" stroke-width="'+(pc===50?1.4:1)+'"'+(pc===50?' stroke-dasharray="4 3"':'')+'/>';
+  });
+  s+='<text x="'+(cx+4)+'" y="'+(cy-R*0.5-3)+'" font-size="8" fill="#9a9a9a" font-family="Arial">50</text>';
+  for(i=0;i<n;i++){ var e=pt(i,R); s+='<line x1="'+cx+'" y1="'+cy+'" x2="'+e[0].toFixed(1)+'" y2="'+e[1].toFixed(1)+'" stroke="#d4d4d4" stroke-width="1"/>'; }
+  var pts=[], any=false;
+  for(i=0;i<n;i++){ var sc=areas[i].score, q=pt(i, R*(sc==null?0:sc)/100); pts.push(q[0].toFixed(1)+','+q[1].toFixed(1)); if(sc!=null) any=true; }
+  if(any){
+    s+='<polygon points="'+pts.join(' ')+'" fill="rgba(162,58,41,0.25)" stroke="#A23A29" stroke-width="2.5" stroke-linejoin="round"/>';
+    for(i=0;i<n;i++){ if(areas[i].score!=null){ var d=pt(i,R*areas[i].score/100); s+='<circle cx="'+d[0].toFixed(1)+'" cy="'+d[1].toFixed(1)+'" r="3.6" fill="#A23A29"/>'; } }
+  }
+  for(i=0;i<n;i++){
+    var l=pt(i,R+16), c=Math.cos(-Math.PI/2+i*2*Math.PI/n), anchor=Math.abs(c)<0.2?'middle':(c>0?'start':'end'), sc2=areas[i].score;
+    s+='<text x="'+l[0].toFixed(1)+'" y="'+(l[1]+(i===0?-4:4)).toFixed(1)+'" text-anchor="'+anchor+'" font-size="10.5" font-weight="700" font-family="Arial" fill="#111">'+esc(areas[i].ar.short)+'</text>';
+    s+='<text x="'+l[0].toFixed(1)+'" y="'+(l[1]+(i===0?-4:4)+12).toFixed(1)+'" text-anchor="'+anchor+'" font-size="11" font-weight="900" font-family="Arial" fill="'+(sc2==null?'#aaa':'#A23A29')+'">'+(sc2==null?'--':Math.round(sc2))+'</text>';
+  }
+  return s+'</svg>';
+}
+function paintPerfil(name){
+  var host=$('perfilBody'), apps=window.__perfilApps;
+  if(!apps){ host.innerHTML=''; return; }
+  if(!name){ host.innerHTML='<div class="hint">Elige una persona para ver su perfil.</div>'; return; }
+  var p=perfilFor(apps, name), html='';
+  var faltan=p.areas.filter(function(a){ return a.score==null; }).map(function(a){ return a.ar.short; });
+  html+='<div class="pf-general'+(p.complete?'':' inc')+'"><div class="pf-num">'+(p.complete?Math.round(p.general):'--')+'</div><div class="pf-txt">'
+      +(p.complete ? '<b>Perfil general</b><br>Media de sus 5 áreas. Supera, de media, al '+Math.round(p.general)+' % de los deportistas.'
+                   : '<b>Perfil incompleto</b><br>La nota general necesita las 5 áreas. Faltan: '+esc(faltan.join(', '))+'.')
+      +'</div></div>';
+  html+=perfilRadarSvg(p.areas);
+  p.areas.forEach(function(a){
+    var tot=a.items.length, det=a.items.map(function(it){
+      var nm=perfilAppName(it.slug), w=it.w<1 ? ' <span style="color:#999">(peso '+it.w+')</span>' : '';
+      if(!it.done) return '<div class="l no"><span>'+esc(nm)+w+'</span><span>sin hacer</span></div>';
+      var mt=it.cfg.clasifMetric||it.cfg.metric, val=(typeof mt==='string') ? (' · '+fmtVal(it.val,it.cfg)) : '';
+      return '<div class="l"><span>'+esc(nm)+w+'</span><span>percentil '+Math.round(it.p)+val+' · de '+it.N+(it.N<PERFIL_MIN_N?' (pocos datos)':'')+'</span></div>';
+    }).join('');
+    html+='<div class="pf-area"><div class="pf-area-top"><div class="pf-name">'+esc(a.ar.label)+'<small>'+(a.done?a.done+' de '+tot+' apps':'ninguna app hecha todavía')+'</small></div>'
+        +'<div class="pf-score'+(a.score==null?' none':'')+'">'+(a.score==null?'--':Math.round(a.score))+'</div></div>'
+        +'<div class="pf-bar"><i style="width:'+(a.score==null?0:Math.round(a.score))+'%"></i></div>'
+        +'<div class="pf-det">'+det+'</div></div>';
+  });
+  html+='<div class="pf-note">Posición relativa respecto a todos los deportistas de la suite: el número es el percentil, es decir, el % de personas a las que supera (50 = en la media). Cada app aporta la media de sus '+PERFIL_TOP+' mejores intentos en su prueba oficial. Perfil orientativo; no es un test psicométrico validado. Toca un área para ver el detalle.</div>';
+  host.innerHTML=html;
+}
+async function renderPerfil(){
+  var host=$('perfilBody'); host.innerHTML='<div class="hint">Calculando perfil\u2026</div>';
+  var res; try{ res=(clasifLastRes && Date.now()-(clasifLastRes.meta&&clasifLastRes.meta.at||0)<120000) ? clasifLastRes : await computeClasificacion(); }
+  catch(e){ host.innerHTML='<div class="hint">No se pudo calcular el perfil. Comprueba la conexi\u00f3n.</div>'; return; }
+  var apps=perfilApps(res); window.__perfilApps=apps;
+  var set={}; PERFIL_AREAS.forEach(function(a){ Object.keys(a.apps).forEach(function(slug){ if(apps[slug]) Object.keys(apps[slug].marks).forEach(function(n){ set[n]=1; }); }); });
+  var names=Object.keys(set).sort(), sel=$('perfilWho'), prev=sel.value||getMe();
+  sel.innerHTML='<option value="">\u2014 elige una persona \u2014</option>'+names.map(function(n){ return '<option value="'+esc(n)+'">'+esc(n)+'</option>'; }).join('');
+  sel.value = names.indexOf(prev)>=0 ? prev : '';
+  paintPerfil(sel.value);
+}
+(function(){
+  var sel=$('perfilWho'), btn=$('btnPerfilRef'), body=$('perfilBody'); if(!sel) return;
+  sel.addEventListener('change', function(){ paintPerfil(sel.value); });
+  btn.addEventListener('click', function(){ clasifLastRes=null; renderPerfil(); });
+  body.addEventListener('click', function(e){ var a=e.target.closest('.pf-area'); if(a) a.classList.toggle('open'); });
+})();
 
 /* ---------- Admin ----------
    Sin login de verdad (como el resto de la suite): una clave fija que se
