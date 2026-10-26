@@ -315,7 +315,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v66</div>
+    <div class="app-ver">v67</div>
   </footer>
 
 </div>
@@ -1279,7 +1279,7 @@ function docTime(d){
 }
 function periodFilterDocs(docs){
   if(!CL || CL.t==='t') return docs;
-  var lim=Date.now()-(CL.t==='s'?7:30)*86400000;
+  var n=new Date(), lim=(CL.t==='s') ? new Date(n.getFullYear(),n.getMonth(),n.getDate()-((n.getDay()+6)%7)).getTime() : new Date(n.getFullYear(),n.getMonth(),1).getTime();   // Sem = semana actual (desde el lunes), Mes = mes actual (desde el dia 1)
   return docs.filter(function(d){ var t=docTime(d); return t!=null && t>=lim; });
 }
 function clasifDocKey(cfg,d){
