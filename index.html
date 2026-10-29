@@ -315,7 +315,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v67</div>
+    <div class="app-ver">v68</div>
   </footer>
 
 </div>
@@ -456,7 +456,7 @@ window.hubLoadChamps=async function(){
    de su ultima marca se piden a Firestore solo las nuevas (margen 1 h) + escucha en directo. Si el JSON falla y ya hay copia local, no se gastan lecturas
    completas (se reintenta en 30 min); si no hay copia, se cae a la lectura completa de siempre. Colecciones sin JSON: comportamiento anterior. */
 var STATIC_BASE=(location.hostname==='localhost'||location.hostname==='127.0.0.1') ? '/rds-rankings-data/data/' : 'https://rdsk27.github.io/rds-rankings-data/data/';
-var STATIC_COLS=['scores_ballcoordination','scores_900coordination','scores_circuit','scores_gimnasia','scores_lights','scores_memorycards','scores_perception','scores_perception2','scores_processing','scores_processing2','scores_rallymemory','scores_reactionkarate','scores_reactiontenis','scores_reactiontrial','scores_squares','scores_reaction_10_normal_press_nosound','scores_reaction_10_normal_press_sound'];
+var STATIC_COLS=['scores_ballcoordination','scores_900coordination','scores_memorytouch','scores_circuit','scores_gimnasia','scores_lights','scores_memorycards','scores_perception','scores_perception2','scores_processing','scores_processing2','scores_rallymemory','scores_reactionkarate','scores_reactiontenis','scores_reactiontrial','scores_squares','scores_reaction_10_normal_press_nosound','scores_reaction_10_normal_press_sound'];
 function mkInc(COL,TSF,KEY,STRIP,MASK){
   var HAS_JSON=(STATIC_COLS.indexOf(COL)>=0 || /^scores_reaction_\d+_/.test(COL));   // v56: cualquier combinacion de Reaction (Campeonatos); si no hay JSON, cae a Firestore
   var WEEK=7*864e5, AGE=HAS_JSON?12*36e5:WEEK, MARGIN=(HAS_JSON?1:6)*36e5, c={docs:{},full:0,ts:0}, loaded=false;
@@ -570,7 +570,8 @@ var APPS=[
   { slug:'rds-reactiontenis-test',    name:'Reaction Tenis',    icon:'icons/rds-reactiontenis-test.png' },
   { slug:'rds-reactionkarate-test',   name:'Reaction Karate',   icon:'icons/rds-reactionkarate-test.png' },
   { slug:'rds-rallymemory-test',      name:'Rally Memory',      icon:'icons/rds-rallymemory-test.png' },
-  { slug:'rds-gimnasia-test',         name:'Gimnasia',          icon:'icons/rds-gimnasia-test.png' }
+  { slug:'rds-gimnasia-test',         name:'Gimnasia',          icon:'icons/rds-gimnasia-test.png' },
+  { slug:'rds-memorytouch-test',      name:'Memory Touch',      icon:'icons/rds-memorytouch-test.png' }
 ];
 /* Si ya me he marcado ("quien soy"), se pasa por la URL al abrir la app --
    cada una de las 12 sabe leer ?ini=&dep= (2026-09-28) y se autorrellena/
@@ -595,7 +596,7 @@ var PENDING_KEYS={
   'rds-ballcoordination-test':'coord1_pending', 'rds-900coordination-test':'rds_900c_pending', 'rds-lightsreaction-test':'rds_lst_pending', 'rds-perception-test':'rds_pst_pending', 'rds-perception2-test':'rds_pc2_pending',
   'rds-processing-test':'rds_prst_pending', 'rds-processing2-test':'rds_prst2_pending', 'rds-squares-test':'rds_sqr_pending', 'rds-rallymemory-test':'rds_rallymemory_pending', 'rds-reaction-test':'rds_rank_pending',
   'rds-reactiontenis-test':'rtenis_pending', 'rds-circuit-test':'rds_circ_pending', 'rds-gimnasia-test':'rds_gimnasia_pending',
-  'rds-memorycards-test':'rds_mc_pending', 'rds-reactionkarate-test':'rds_rkarate_pending', 'rds-reactiontrial-test':'rds_rtrial_pending'
+  'rds-memorycards-test':'rds_mc_pending', 'rds-reactionkarate-test':'rds_rkarate_pending', 'rds-reactiontrial-test':'rds_rtrial_pending', 'rds-memorytouch-test':'rds_mt_pending'
 };
 function renderPendBanner(){
   var parts=[], tot=0;
@@ -691,7 +692,7 @@ var PREP_TS='suiterds_prep_ts';
 /* Orden de preparacion (pedido 2026-10-05): Karate antes que Tenis (la de Tenis es la mas pesada, va al final);
    Rally Memory y Gimnasia no se preparan. */
 var PREP_SLUGS=['rds-reaction-test','rds-processing-test','rds-processing2-test','rds-perception-test','rds-perception2-test','rds-ballcoordination-test','rds-900coordination-test',
-  'rds-lightsreaction-test','rds-memorycards-test','rds-reactiontrial-test','rds-circuit-test','rds-squares-test','rds-reactionkarate-test','rds-reactiontenis-test'];
+  'rds-lightsreaction-test','rds-memorycards-test','rds-reactiontrial-test','rds-circuit-test','rds-squares-test','rds-reactionkarate-test','rds-memorytouch-test','rds-reactiontenis-test'];
 function prepareApp(slug){
   return new Promise(function(resolve){
     var done=false, t0=Date.now(), iframe=document.createElement('iframe');
@@ -1154,6 +1155,18 @@ var APP_ADAPTERS=[
     ],
     dimLabel:function(v){ return {normal:'Normal',extremo:'Extremo',limite:'Límite'}[v.mode||'normal']; },
     buildMatch:function(v){ return { mode:v.mode||'normal', stim:'a', total:'a' }; } },
+  { slug:'rds-memorytouch-test', name:'Memory Touch',
+    collection:'scores_memorytouch', match:{mode:'normal', stim:'a', total:'a'},
+    metric:'ensayos', better:'higher', unidad:'aciertos', inClasif:true,
+    /* Clasificacion (2026-10-29): Normal. Puntua por ACIERTOS (ensayos = gestos acertados en total) y, de desempate, el tiempo medio por gesto en ms (menos = mejor; incluye el tiempo de memorizar): valor compuesto, mayor = mejor. */
+    clasifMetric:function(d){ return (d.ensayos||0)*100000-(d.avg||0); },
+    clasifFmt:function(d){ return (d.ensayos||0)+' ac \u00b7 '+(d.avg||0)+' ms'; },
+    /* Campeonatos: los 3 modos (Normal, Extremo, Limite); stim y total son siempre 'a'. */
+    dims:[
+      { key:'mode', label:'Modo', def:'normal', options:[ {value:'normal',label:'Normal'},{value:'extremo',label:'Extremo'},{value:'limite',label:'Límite'} ] }
+    ],
+    dimLabel:function(v){ return {normal:'Normal',extremo:'Extremo',limite:'Límite'}[v.mode||'normal']; },
+    buildMatch:function(v){ return { mode:v.mode||'normal', stim:'a', total:'a' }; } },
   { slug:'rds-reactionkarate-test', name:'Reaction Karate',
     collection:'scores_reactionkarate', match:{s1:'def', s2:'10', s3:'paus'},
     metric:'avg', better:'lower', unidad:'ms', inClasif:true,
@@ -1554,7 +1567,7 @@ var PERFIL_AREAS=[
   { key:'reaccion',      label:'Reacción',                  short:'Reacción',      apps:{ 'rds-reaction-test':1, 'rds-lightsreaction-test':1, 'rds-squares-test':1, 'rds-reactionkarate-test':0.4 } },
   { key:'percepcion',    label:'Percepción',                short:'Percepción',    apps:{ 'rds-perception-test':1, 'rds-perception2-test':1 } },
   { key:'procesamiento', label:'Procesamiento y decisión',  short:'Procesamiento', apps:{ 'rds-processing-test':1, 'rds-processing2-test':1, 'rds-reactiontrial-test':1 } },
-  { key:'memoria',       label:'Memoria',                   short:'Memoria',       apps:{ 'rds-memorycards-test':1 } },
+  { key:'memoria',       label:'Memoria',                   short:'Memoria',       apps:{ 'rds-memorycards-test':1, 'rds-memorytouch-test':1 } },
   { key:'coordinacion',  label:'Coordinación óculo-manual', short:'Coordinación',  apps:{ 'rds-ballcoordination-test':1, 'rds-900coordination-test':1, 'rds-reactiontenis-test':1, 'rds-reactionkarate-test':1, 'rds-reactiontrial-test':0.5, 'rds-circuit-test':1, 'rds-squares-test':0.4, 'rds-lightsreaction-test':0.4 } }
 ];
 function perfilMarks(cfg, docs){   /* nombre -> { val: media de sus PERFIL_TOP mejores intentos, n: intentos usados } */
