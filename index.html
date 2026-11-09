@@ -315,7 +315,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v69</div>
+    <div class="app-ver">v70</div>
   </footer>
 
 </div>
@@ -569,10 +569,8 @@ var APPS=[
   { slug:'rds-reactiontrial-test',    name:'Reaction Trial',    icon:'icons/rds-reactiontrial-test.png' },
   { slug:'rds-circuit-test',          name:'Circuit Reaction',  icon:'icons/rds-circuit-test.png' },
   { slug:'rds-reactiontenis-test',    name:'Reaction Tenis',    icon:'icons/rds-reactiontenis-test.png' },
-  { slug:'rds-reactionkarate-test',   name:'Reaction Karate',   icon:'icons/rds-reactionkarate-test.png' },
-  { slug:'rds-rallymemory-test',      name:'Rally Memory',      icon:'icons/rds-rallymemory-test.png' },
-  { slug:'rds-gimnasia-test',         name:'Gimnasia',          icon:'icons/rds-gimnasia-test.png' }
-];
+  { slug:'rds-reactionkarate-test',   name:'Reaction Karate',   icon:'icons/rds-reactionkarate-test.png' }
+];   /* v70: Rally Memory y Gimnasia fuera de la pestana Apps (pedido de Roberto); las apps y sus datos siguen */
 /* Si ya me he marcado ("quien soy"), se pasa por la URL al abrir la app --
    cada una de las 12 sabe leer ?ini=&dep= (2026-09-28) y se autorrellena/
    resalta como si lo hubiera escrito alli mismo. Sin marcar, URL normal. */
@@ -1743,7 +1741,7 @@ function nextChampNumber(){
 function champFullName(c){
   return c.number ? ('Campeonato '+c.number+' - '+(c.title||'')) : (c.title||'');
 }
-function appNameOf(slug){ var a=APPS.filter(function(x){ return x.slug===slug; })[0]; return a?a.name:slug; }
+function appNameOf(slug){ var a=APPS.filter(function(x){ return x.slug===slug; })[0]; if(a) return a.name; var c=adapterOf(slug); return c?c.name.replace(/&#d+;/g,''):slug; }   /* v70: Rally Memory y Gimnasia ya no estan en APPS, pero pueden salir en campeonatos */
 /* 2026-10-04: la tarjeta muestra solo el nombre; al pulsarlo se despliega la lista de pruebas
    ("App: modo - modo - modo") y debajo el boton Ver tabla (y Editar/Borrar si eres admin). */
 var CHAMP_OPEN={};
