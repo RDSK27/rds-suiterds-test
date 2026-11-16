@@ -1,5 +1,5 @@
 /* SuiteRDS - Service Worker */
-var CACHE = 'suiterds-v70';
+var CACHE = 'suiterds-v71';
 var ASSETS = [
   './',
   './index.html',
@@ -13,6 +13,7 @@ var ASSETS = [
   './icons/rds-reaction-test.png',
   './icons/rds-processing-test.png',
   './icons/rds-processing2-test.png',
+  './icons/rds-processing3-test.png',
   './icons/rds-perception-test.png',
   './icons/rds-perception2-test.png',
   './icons/rds-ballcoordination-test.png',
