@@ -315,7 +315,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v71</div>
+    <div class="app-ver">v72</div>
   </footer>
 
 </div>
@@ -633,6 +633,16 @@ function renderAppGrid(){
     btn.target='_blank';
     btn.rel='noopener';
     btn.innerHTML='<img src="'+a.icon+'" alt=""><span>'+a.name+'</span>';
+    /* 2026-11-17: si hay iniciales escritas en la barra "quien soy" pero no se pulso Marcarme/Cambiar, se guardan
+       solas al abrir la app y se le pasan (antes la app abria sin nombre y guardaba RDS). */
+    btn.addEventListener('click', function(e){
+      var i=$('meIniInput'), d=$('meDepSelect'); if(!i || !d) return;
+      var ini=(i.value||'').toUpperCase().replace(/[^A-Z]/g,'').slice(0,3); if(!ini) return;
+      if(ini+'-'+(d.value||'OTR')===getMe()) return;
+      e.preventDefault();
+      setMe(ini, d.value);
+      window.open(appUrl(a.slug), '_blank', 'noopener');
+    });
     g.appendChild(btn);
   });
 }
