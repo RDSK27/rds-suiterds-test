@@ -315,7 +315,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v74</div>
+    <div class="app-ver">v75</div>
   </footer>
 
 </div>
@@ -690,7 +690,10 @@ async function warmAllApps(){
     await warmApp(APPS[i].slug);
   }
 }
-warmAllApps();
+/* 2026-11-17: el precalentado empieza 3 s DESPUES de terminar de cargar SuiteRDS: los iframes que se anaden antes de
+   ese momento retrasan el fin de carga (y con el, el registro del Service Worker) hasta que acaban las 18 apps. */
+if(document.readyState==='complete') setTimeout(warmAllApps, 3000);
+else window.addEventListener('load', function(){ setTimeout(warmAllApps, 3000); });
 
 /* ---------- Preparar rankings offline (Admin, 2026-10-05) ----------
    Abre cada app en un iframe oculto (mismo origen) y le pide rdsPrepare(): la app
