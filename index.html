@@ -315,7 +315,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v72</div>
+    <div class="app-ver">v73</div>
   </footer>
 
 </div>
@@ -766,9 +766,11 @@ var SPORT_OPTIONS=[
   ['SRF','Surf'],['TKD','Taekwondo'],['TNS','Tenis'],['TRI','Triatlón'],['VOL','Voleibol']
 ];
 function getMe(){ try{ return localStorage.getItem(ME_LS)||''; }catch(e){ return ''; } }
+/* v73 (2026-11-17): identidad guardada antes de v73 sin hora: se le pone ahora para que las apps la recojan una vez. */
+try{ if(localStorage.getItem(ME_LS) && !localStorage.getItem(ME_LS+'_ts')) localStorage.setItem(ME_LS+'_ts', String(Date.now())); }catch(e){}
 function setMe(ini, dep){
   var v=(ini||'').trim().toUpperCase().replace(/[^A-Z]/g,'').slice(0,3)+'-'+(dep||'OTR');
-  try{ localStorage.setItem(ME_LS, v); }catch(e){}
+  try{ localStorage.setItem(ME_LS, v); localStorage.setItem(ME_LS+'_ts', String(Date.now())); }catch(e){}   /* v73: la hora avisa a las apps (mismo almacenamiento) de que hay identidad nueva */
   renderMeBar();
   renderAppGrid(); try{ renderPendBanner(); }catch(e){}   // los botones de Rankings ya llevan la identidad nueva en la URL
 }
