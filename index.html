@@ -315,7 +315,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v75</div>
+    <div class="app-ver">v76</div>
   </footer>
 
 </div>
@@ -661,17 +661,22 @@ renderAppGrid();
    app evita que se quede esperando para siempre. */
 function warmApp(slug){
   return new Promise(function(resolve){
-    var done=false;
+    var done=false, aborted=false;
     var iframe=document.createElement('iframe');
     iframe.style.cssText='position:absolute;width:0;height:0;border:0;visibility:hidden;';
     iframe.src='https://rdsk27.github.io/'+slug+'/';
     function finish(){
       if(done) return; done=true;
       clearTimeout(safety);
+      document.removeEventListener('visibilitychange', onHide);
       try{ iframe.remove(); }catch(e){}
-      resolve();
+      resolve(!aborted);
     }
     var safety=setTimeout(finish, 12000);
+    /* 2026-11-19: si SuiteRDS pasa a segundo plano (se abre una app para jugar), se corta esta precarga para no quitarle
+       potencia al movil durante el juego (Processing 3 se trababa); se repite al volver a SuiteRDS. */
+    function onHide(){ if(document.visibilityState==='hidden'){ aborted=true; finish(); } }
+    document.addEventListener('visibilitychange', onHide);
     iframe.addEventListener('load', function(){
       try{
         var w=iframe.contentWindow;
@@ -687,7 +692,10 @@ function warmApp(slug){
 async function warmAllApps(){
   if(!navigator.onLine) return;
   for(var i=0;i<APPS.length;i++){
-    await warmApp(APPS[i].slug);
+    if(document.visibilityState==='hidden') await new Promise(function(r){ function v(){ if(document.visibilityState==='visible'){ document.removeEventListener('visibilitychange',v); setTimeout(r,3000); } } document.addEventListener('visibilitychange',v); });   /* 2026-11-19: en pausa mientras SuiteRDS no se ve */
+    if(!navigator.onLine) return;
+    var ok=await warmApp(APPS[i].slug);
+    if(ok===false) i--;   /* cortada al pasar a segundo plano: se repite esa app */
   }
 }
 /* 2026-11-17: el precalentado empieza 3 s DESPUES de terminar de cargar SuiteRDS: los iframes que se anaden antes de
