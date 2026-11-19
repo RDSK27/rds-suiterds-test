@@ -186,6 +186,7 @@ if('serviceWorker' in navigator){
   .ct-toggle{display:flex;gap:8px;margin:0 0 10px;}
   .ct-toggle button{flex:1;padding:8px 6px;border:2px solid var(--borde);border-radius:6px;background:#fff;font-weight:800;font-size:11.5px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;color:var(--negro);}
   .ct-toggle button.on{background:#111;color:#fff;border-color:#111;}
+  #clasifMode button.on{background:var(--rojo);border-color:var(--rojo);}   /* v77: Normal | Extremo | Limite */
   .per-tog{display:flex;justify-content:center;gap:6px;margin:0 0 10px;}   /* v64: Sem | Mes | Todo (periodo de las marcas) */
   .per-tog button{min-width:54px;padding:5px 12px;border:1px solid #bbb;background:#fff;color:var(--negro);border-radius:6px;font-weight:800;font-size:11px;letter-spacing:0.04em;text-transform:uppercase;cursor:pointer;}
   .per-tog button.on{background:var(--rojo);color:#fff;border-color:var(--rojo);}
@@ -286,6 +287,7 @@ if('serviceWorker' in navigator){
 
     <!-- ================= CLASIFICACION ================= -->
     <section class="panel" id="panel-clasificacion">
+      <div class="ct-toggle" id="clasifMode"><button data-mo="normal" class="on">Normal</button><button data-mo="extremo">Extremo</button><button data-mo="limite">Límite</button></div>
       <div class="ct-toggle" id="clasifTog"><button data-cm="pts">Puntos</button><button data-cm="pos">Puestos</button><button data-cm="dep" id="clSportBtn">Deportes</button></div>
       <div class="per-tog" id="clasifPer"><button data-p="s">Sem</button><button data-p="m">Mes</button><button data-p="t" class="on">Todo</button></div>
       <div class="pend-banner" id="pendBannerC"></div>
@@ -315,7 +317,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v76</div>
+    <div class="app-ver">v77</div>
   </footer>
 
 </div>
@@ -1262,6 +1264,46 @@ var APP_ADAPTERS=[
     } }
 ];
 function adapterOf(slug){ return APP_ADAPTERS.filter(function(a){ return a.slug===slug; })[0]||null; }
+/* ---------- v77 (2026-11-19, pedido de Roberto): Ranking por MODO (Normal | Extremo | Limite) ----------
+   Normal = la clasificacion de siempre. Extremo y Limite: en cada app se usa la MISMA seleccion por defecto que en Normal y solo cambia
+   el modo (lo que la propia app fuerce en ese modo se respeta: p. ej. Squares/Perception 2 en Limite guardan total '0', Ball en Limite
+   count 0 y sin penalizacion). En Limite casi todas puntuan por ACIERTOS (mas = mejor) y la media de desempate, igual que su ranking.
+   Apps sin modos Extremo/Limite (Velocidad de Reaccion, Reaction Tenis, Reaction Karate) solo cuentan en Normal.
+   Reaction Trial: el boton que la app ENSENA como "Extremo" guarda s1:'limite' y el de "Limite" guarda s1:'extremo' (etiquetas cambiadas).
+   El Perfil sigue usando siempre Normal. */
+function clEnsMetric(d){ return (d.ensayos||0)*100000-(d.avg||0); }
+function clEnsFmt(d){ return (d.ensayos||0)+' ac · '+Math.round(d.avg||0)+' ms'; }
+var CL_ENS={ metric:clEnsMetric, better:'higher', fmt:clEnsFmt, unidad:'aciertos' };
+function clMode(match, extra){ var o={ match:match }; if(extra){ for(var k in extra) o[k]=extra[k]; } return o; }
+var CLASIF_MODES={
+  'rds-ballcoordination-test':{ extremo:clMode({mode:'extremo',count:15,penaliza:true}),
+    limite:clMode({mode:'limite',count:0,penaliza:false},{ metric:function(d){ return (d.trials||0)*100000-(d.avgRT||0); }, better:'higher', unidad:'ensayos',
+      fmt:function(d){ return (d.trials||0)+' ens · '+Math.round(d.avgRT||0)+' ms'; } }) },
+  'rds-lightsreaction-test':{ extremo:clMode({mode:'extremo',stim:'cambia',total:15}), limite:clMode({mode:'limite',stim:'cambia',total:15},CL_ENS) },
+  'rds-perception-test':{ extremo:clMode({mode:'extremo',stim:'fijo',total:5}), limite:clMode({mode:'limite',stim:'fijo',total:5},CL_ENS) },
+  'rds-processing-test':{ extremo:clMode({mode:'extremo',stim:'cambia',total:15}), limite:clMode({mode:'limite',stim:'cambia',total:15},CL_ENS) },
+  'rds-processing3-test':{ extremo:clMode({mode:'extremo',stim:'cambia',total:15}), limite:clMode({mode:'limite',stim:'cambia',total:15},CL_ENS) },
+  'rds-squares-test':{ extremo:clMode({mode:'extremo',stim:'a',total:'x1'}), limite:clMode({mode:'limite',stim:'a',total:'0'},CL_ENS) },
+  'rds-perception2-test':{ extremo:clMode({mode:'extremo',stim:'3x3',total:'10'}), limite:clMode({mode:'limite',stim:'3x3',total:'0'},CL_ENS) },
+  'rds-processing2-test':{ extremo:clMode({mode:'extremo',stim:'estatico',total:25}), limite:clMode({mode:'limite',stim:'estatico',total:25}) },
+  'rds-circuit-test':{ extremo:clMode({s1:'ext',s2:'lem',s3:'3'}), limite:clMode({s1:'lim',s2:'lem',s3:'3'}) },
+  'rds-memorycards-test':{ extremo:clMode({modo:'extremo'}), limite:clMode({modo:'limite'}) },
+  'rds-reactiontrial-test':{ extremo:clMode({s1:'limite',s2:'15',s3:'nonstop'}), limite:clMode({s1:'extremo',s2:'15',s3:'nonstop'}) },
+  'rds-900coordination-test':{ extremo:clMode({mode:'extremo',stim:'a',total:'a'}), limite:clMode({mode:'limite',stim:'a',total:'a'}) },
+  'rds-memorytouch-test':{ extremo:clMode({mode:'extremo',stim:'a',total:'a'}), limite:clMode({mode:'limite',stim:'a',total:'a'}) }
+};
+/* Lista de apps de la Clasificacion para un modo: en Normal los adaptadores tal cual; en Extremo/Limite una copia con el match/metrica de ese modo. */
+function clasifLista(mo){
+  mo=mo||'normal';
+  return APP_ADAPTERS.filter(function(a){ return a.inClasif; }).map(function(a){
+    if(mo==='normal'){ var n=Object.create(a); n.ck=a.slug; return n; }
+    var m=CLASIF_MODES[a.slug] && CLASIF_MODES[a.slug][mo]; if(!m) return null;
+    var c=Object.create(a);
+    c.ck=a.slug+'@'+mo; c.clasifMatch=m.match; c.clasifFilter=null;
+    if(m.metric){ c.clasifMetric=m.metric; c.better=m.better; c.clasifFmt=m.fmt; c.unidad=m.unidad; }
+    return c;
+  }).filter(Boolean);
+}
 /* Mejor marca de cada persona (por nombre exacto, tal como lo escribio
    -- INI o INI-DEPORTE) dentro de un ranking, sin repetidos. */
 function dedupeBest(docs, metric, better){
@@ -1352,9 +1394,10 @@ function clasifSaveCache(slug,docs,col){
   try{ localStorage.setItem(CLASIF_CACHE_PREFIX+slug, JSON.stringify({ts:Date.now(), col:col, docs:slim})); }catch(e){}
 }
 function clasifLoadCache(slug,col){ try{ var c=JSON.parse(localStorage.getItem(CLASIF_CACHE_PREFIX+slug)||'null'); return (c && c.col===col) ? c : null; }catch(e){ return null; } }
-async function computeClasificacion(liveDocs){
+async function computeClasificacion(liveDocs, mo){
+  mo=mo||CL.mo;
   var totals={}, det={}, tables=[];
-  var lista=APP_ADAPTERS.filter(function(a){ return a.inClasif; });
+  var lista=clasifLista(mo);
   var online=navigator.onLine;
   /* En paralelo (no una app detras de otra): si alguna tarda o se atasca,
      no alarga la espera de las demas, y el limite total es ~FETCH_TIMEOUT_MS
@@ -1368,9 +1411,9 @@ async function computeClasificacion(liveDocs){
   var meta={ offline:!online, stale:0, ts:0, n:lista.length, at:Date.now() };
   lista.forEach(function(cfg, i){
     var docs=results[i];
-    if(docs){ clasifSaveCache(cfg.slug, docs, clasifCol(cfg)); }
+    if(docs){ clasifSaveCache(cfg.ck, docs, clasifCol(cfg)); }
     else {
-      var c=clasifLoadCache(cfg.slug, clasifCol(cfg));
+      var c=clasifLoadCache(cfg.ck, clasifCol(cfg));
       if(c && c.docs){ docs=c.docs; meta.stale++; meta.ts = meta.ts ? Math.min(meta.ts,c.ts) : c.ts; }
       else { docs=[]; meta.stale++; }
     }
@@ -1392,8 +1435,9 @@ async function computeClasificacion(liveDocs){
   });
   var list=Object.keys(totals).map(function(k){ var tt=totals[k]; tt.det=det[k]||{}; return tt; });
   list.sort(function(a,b){ return b.points-a.points; });
-  clasifLastRes={ list:list, meta:meta, tables:tables };
-  return clasifLastRes;
+  var res={ list:list, meta:meta, tables:tables, mo:mo, lista:lista };
+  if(mo===CL.mo) clasifLastRes=res;   // v77: el Perfil (siempre Normal) no pisa lo que se ve en Ranking con otro modo
+  return res;
 }
 /* Pie de diagnostico (2026-10-01): version de SuiteRDS, hora del calculo y de donde salen los datos, para poder comparar dos aparatos. */
 function clasifFooterHtml(meta){
@@ -1443,11 +1487,11 @@ async function renderClasificacion(){
     return;
   }
   host.innerHTML='<div class="hint">Calculando\u2026</div>';
-  var lista=APP_ADAPTERS.filter(function(a){ return a.inClasif; });
+  var lista=clasifLista(CL.mo);
   lista.forEach(function(cfg){
     var u=window.hubWatchRanking(clasifCol(cfg), cfg.clasifMatch||cfg.match, function(docs){
       clasifLive[cfg.slug]=docs;
-      clasifSaveCache(cfg.slug, docs, clasifCol(cfg));
+      clasifSaveCache(cfg.ck, docs, clasifCol(cfg));
       if(!clasifPainted){
         if(Object.keys(clasifLive).length>=lista.length){ if(clasifFirstTo){ clearTimeout(clasifFirstTo); clasifFirstTo=null; } repaintClasificacion(); }
       } else { scheduleClasifRepaint(); }
@@ -1470,7 +1514,8 @@ window.addEventListener('online', function(){ var panel=$('panel-clasificacion')
 function pad2p(n){ return n<10 ? '0'+n : String(n); }
 function clasifDetalleHtml(row){
   var det=row.det||{};
-  return APPS.filter(function(a){ return APP_ADAPTERS.some(function(c){ return c.slug===a.slug && c.inClasif; }); }).map(function(a){
+  var lst=(clasifLastRes && clasifLastRes.lista) || clasifLista(CL.mo);
+  return APPS.filter(function(a){ return lst.some(function(c){ return c.slug===a.slug; }); }).map(function(a){
     var d=det[a.slug];
     var res = d ? (pad2p(d.pos)+'- '+(d.fmt ? d.fmt(d.doc) : fmtVal(d.val,{unidad:d.unidad}))) : '';
     return '<div class="clasif-det-line"><span class="cdl-app">'+a.name+'</span><span class="cdl-res">'+res+'</span></div>';
@@ -1483,7 +1528,7 @@ function clasifDetalleHtml(row){
    tras el guion del nombre, p.ej. LEO-TRI -> TRI), se suman los 3 mejores de cada deporte (Puntos: mas puntos; Puestos: menos suma) y se ordenan
    los deportes. Si un deporte tiene menos de 3 deportistas: con 1 se triplica su puntuacion; con 2 se duplica la del peor (decision de Roberto). */
 var CLAS_MISS_PLUS=1, CLAS_TOP=3, clasifLastRes=null;
-var CL={ m:'pts', sp:false, t:'t' };   // t = periodo: s (ultimos 7 dias) | m (ultimos 30) | t (todo); no se guarda: siempre arranca en Todo
+var CL={ m:'pts', sp:false, t:'t', mo:'normal' };   // v77: mo = modo (normal|extremo|limite); no se guarda: siempre arranca en Normal   // t = periodo: s (ultimos 7 dias) | m (ultimos 30) | t (todo); no se guarda: siempre arranca en Todo
 try{ var _cl=JSON.parse(localStorage.getItem('suiterds_cl')||'null'); if(_cl){ CL.m=(_cl.m==='pos')?'pos':'pts'; CL.sp=!!_cl.sp; } }catch(e){}
 function clasifSportOf(name){ var i=(name||'').indexOf('-'); return i>0 ? name.slice(i+1) : 'OTR'; }
 function clasifSportLabel(code){ var o=SPORT_OPTIONS.filter(function(x){ return x[0]===code; })[0]; return o ? o[1] : code; }
@@ -1559,6 +1604,14 @@ function clasifSyncTog(){
     if(clasifLastRes) paintClasificacion(clasifLastRes.list, clasifLastRes.meta);
   });
   clasifSyncTog();
+  var mob=$('clasifMode');
+  if(mob) mob.addEventListener('click', function(e){   /* v77: Normal | Extremo | Limite -> otras pruebas: hay que volver a leer */
+    var b=e.target.closest('button'); if(!b) return;
+    var mo=b.getAttribute('data-mo'); if(mo===CL.mo) return;
+    CL.mo=mo; clasifLastRes=null;
+    Array.prototype.forEach.call(mob.querySelectorAll('button'), function(x){ x.classList.toggle('on', x===b); });
+    renderClasificacion();
+  });
   var per=$('clasifPer');
   if(per) per.addEventListener('click', function(e){
     var b=e.target.closest('button'); if(!b) return;
@@ -1704,7 +1757,7 @@ function paintPerfil(name){
 }
 async function renderPerfil(){
   var host=$('perfilBody'); host.innerHTML='<div class="hint">Calculando perfil\u2026</div>';
-  var res; try{ res=(clasifLastRes && Date.now()-(clasifLastRes.meta&&clasifLastRes.meta.at||0)<120000) ? clasifLastRes : await computeClasificacion(); }
+  var res; try{ res=(clasifLastRes && clasifLastRes.mo==='normal' && Date.now()-(clasifLastRes.meta&&clasifLastRes.meta.at||0)<120000) ? clasifLastRes : await computeClasificacion(null,'normal'); }
   catch(e){ host.innerHTML='<div class="hint">No se pudo calcular el perfil. Comprueba la conexi\u00f3n.</div>'; return; }
   var apps=perfilApps(res); window.__perfilApps=apps;
   var set={}; PERFIL_AREAS.forEach(function(a){ Object.keys(a.apps).forEach(function(slug){ if(apps[slug]) Object.keys(apps[slug].marks).forEach(function(n){ set[n]=1; }); }); });
