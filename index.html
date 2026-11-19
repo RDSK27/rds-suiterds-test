@@ -317,7 +317,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v77</div>
+    <div class="app-ver">v78</div>
   </footer>
 
 </div>
@@ -951,18 +951,16 @@ var APP_ADAPTERS=[
     dims:[
       { key:'mode', label:'Modo', def:'normal', options:[
           {value:'normal',label:'Normal'},{value:'extremo',label:'Extremo'} ] },
-      { key:'stim', label:'Estímulo', def:'cambia', options:[
-          {value:'cambia',label:'Sin espera'},{value:'fijo',label:'Con espera'} ] },
+      /* v78 (2026-11-19): Processing 3 ya no tiene Sin espera / Con espera (siempre 'cambia'): no se ofrece Estimulo. */
       { key:'total', label:'Ensayos', def:'15', options:[
           {value:'15',label:'15'},{value:'25',label:'25'},{value:'50',label:'50'} ] }
     ],
     dimLabel:function(v){
       var modeLbl={normal:'Normal',extremo:'Extremo'}[v.mode||'normal'];
-      var stimLbl={cambia:'Sin espera',fijo:'Con espera'}[v.stim||'cambia'];
-      return modeLbl+', '+stimLbl+', '+(v.total||'15');
+      return modeLbl+', '+(v.total||'15');
     },
     buildMatch:function(v){
-      return { mode:v.mode||'normal', stim:v.stim||'cambia', total:parseInt(v.total||'15',10) };
+      return { mode:v.mode||'normal', stim:'cambia', total:parseInt(v.total||'15',10) };
     } },
   { slug:'rds-squares-test', name:'Squares Reaction',
     collection:'scores_squares', match:{mode:'normal', stim:'a', total:'x1'},

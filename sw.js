@@ -1,5 +1,5 @@
 /* SuiteRDS - Service Worker */
-var CACHE = 'suiterds-v77';
+var CACHE = 'suiterds-v78';
 var ASSETS = [
   './',
   './index.html',
