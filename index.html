@@ -321,7 +321,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v79</div>
+    <div class="app-ver">v80</div>
   </footer>
 
 </div>
@@ -696,9 +696,20 @@ function warmApp(slug){
     document.body.appendChild(iframe);
   });
 }
+/* 2026-11-20 (GitHub Pages respondio "Rate limit exceeded" a todo rdsk27.github.io): antes se cargaban las 18 apps (~7 MB,
+   cientos de peticiones) CADA vez que se abria SuiteRDS, aunque ya estuvieran guardadas; con varios moviles en la misma wifi
+   GitHub lo ve como un abuso desde una sola conexion y la bloquea un rato. Ahora solo se precarga una app si en este aparato
+   aun NO tiene su Service Worker (nunca se abrio ni se precargo); las ya guardadas se actualizan solas al abrirlas.
+   Fuera de rdsk27.github.io (pruebas en localhost) no se precarga nada. */
+function appAlreadySaved(slug){
+  try{ return navigator.serviceWorker.getRegistration('/'+slug+'/').then(function(r){ return !!(r && (r.active||r.waiting||r.installing) && r.scope.indexOf('/'+slug+'/')>=0); }).catch(function(){ return false; }); }
+  catch(e){ return Promise.resolve(false); }
+}
 async function warmAllApps(){
   if(!navigator.onLine) return;
+  if(location.hostname!=='rdsk27.github.io' || !('serviceWorker' in navigator)) return;
   for(var i=0;i<APPS.length;i++){
+    if(await appAlreadySaved(APPS[i].slug)) continue;
     if(document.visibilityState==='hidden') await new Promise(function(r){ function v(){ if(document.visibilityState==='visible'){ document.removeEventListener('visibilitychange',v); setTimeout(r,3000); } } document.addEventListener('visibilitychange',v); });   /* 2026-11-19: en pausa mientras SuiteRDS no se ve */
     if(!navigator.onLine) return;
     var ok=await warmApp(APPS[i].slug);
