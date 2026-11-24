@@ -321,7 +321,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v81</div>
+    <div class="app-ver">v82</div>
   </footer>
 
 </div>
@@ -462,7 +462,7 @@ window.hubLoadChamps=async function(){
    de su ultima marca se piden a Firestore solo las nuevas (margen 1 h) + escucha en directo. Si el JSON falla y ya hay copia local, no se gastan lecturas
    completas (se reintenta en 30 min); si no hay copia, se cae a la lectura completa de siempre. Colecciones sin JSON: comportamiento anterior. */
 var STATIC_BASE=(location.hostname==='localhost'||location.hostname==='127.0.0.1') ? '/rds-rankings-data/data/' : 'https://rdsk27.github.io/rds-rankings-data/data/';
-var STATIC_COLS=['scores_ballcoordination','scores_900coordination','scores_memorytouch','scores_circuit','scores_gimnasia','scores_lights','scores_memorycards','scores_perception','scores_perception2','scores_processing','scores_processing2','scores_rallymemory','scores_reactionkarate','scores_reactiontenis','scores_reactiontrial','scores_squares','scores_reaction_10_normal_press_nosound','scores_reaction_10_normal_press_sound'];
+var STATIC_COLS=['scores_ballcoordination','scores_900coordination','scores_memorytouch','scores_circuit','scores_gimnasia','scores_lights','scores_memorycards','scores_perception','scores_perception2','scores_schulte','scores_processing','scores_processing2','scores_rallymemory','scores_reactionkarate','scores_reactiontenis','scores_reactiontrial','scores_squares','scores_reaction_10_normal_press_nosound','scores_reaction_10_normal_press_sound'];
 function mkInc(COL,TSF,KEY,STRIP,MASK){
   var HAS_JSON=(STATIC_COLS.indexOf(COL)>=0 || /^scores_reaction_\d+_/.test(COL));   // v56: cualquier combinacion de Reaction (Campeonatos); si no hay JSON, cae a Firestore
   var WEEK=7*864e5, AGE=HAS_JSON?12*36e5:WEEK, MARGIN=(HAS_JSON?1:6)*36e5, c={docs:{},full:0,ts:0}, loaded=false;
@@ -567,6 +567,7 @@ var APPS=[
   { slug:'rds-processing3-test',      name:'Processing 3',      icon:'icons/rds-processing3-test.png' },
   { slug:'rds-perception-test',       name:'Perception',        icon:'icons/rds-perception-test.png' },
   { slug:'rds-perception2-test',      name:'Perception 2',      icon:'icons/rds-perception2-test.png' },
+  { slug:'rds-schulte-test',          name:'Schulte Perception', icon:'icons/rds-schulte-test.png' },
   { slug:'rds-ballcoordination-test', name:'Ball Coordination', icon:'icons/rds-ballcoordination-test.png' },
   { slug:'rds-900coordination-test',  name:'900 Coordination',  icon:'icons/rds-900coordination-test.png' },
   { slug:'rds-lightsreaction-test',   name:'Lights Speed',      icon:'icons/rds-lightsreaction-test.png' },
@@ -598,7 +599,7 @@ function appUrl(slug){
    tamano de cada cola para avisar de que apps hay que abrir con conexion
    (solo se ve si SuiteRDS y las apps comparten localStorage en este movil). */
 var PENDING_KEYS={
-  'rds-ballcoordination-test':'coord1_pending', 'rds-900coordination-test':'rds_900c_pending', 'rds-lightsreaction-test':'rds_lst_pending', 'rds-perception-test':'rds_pst_pending', 'rds-perception2-test':'rds_pc2_pending',
+  'rds-ballcoordination-test':'coord1_pending', 'rds-900coordination-test':'rds_900c_pending', 'rds-lightsreaction-test':'rds_lst_pending', 'rds-perception-test':'rds_pst_pending', 'rds-perception2-test':'rds_pc2_pending', 'rds-schulte-test':'rds_sch_pending',
   'rds-processing-test':'rds_prst_pending', 'rds-processing2-test':'rds_prst2_pending', 'rds-processing3-test':'rds_prst3_pending', 'rds-squares-test':'rds_sqr_pending', 'rds-rallymemory-test':'rds_rallymemory_pending', 'rds-reaction-test':'rds_rank_pending',
   'rds-reactiontenis-test':'rtenis_pending', 'rds-circuit-test':'rds_circ_pending', 'rds-gimnasia-test':'rds_gimnasia_pending',
   'rds-memorycards-test':'rds_mc_pending', 'rds-reactionkarate-test':'rds_rkarate_pending', 'rds-reactiontrial-test':'rds_rtrial_pending', 'rds-memorytouch-test':'rds_mt_pending'
@@ -729,7 +730,7 @@ else window.addEventListener('load', function(){ setTimeout(warmAllApps, 3000); 
 var PREP_TS='suiterds_prep_ts';
 /* Orden de preparacion (pedido 2026-10-05): Karate antes que Tenis (la de Tenis es la mas pesada, va al final);
    Rally Memory y Gimnasia no se preparan. */
-var PREP_SLUGS=['rds-reaction-test','rds-processing-test','rds-processing2-test','rds-processing3-test','rds-perception-test','rds-perception2-test','rds-ballcoordination-test','rds-900coordination-test',
+var PREP_SLUGS=['rds-reaction-test','rds-processing-test','rds-processing2-test','rds-processing3-test','rds-perception-test','rds-perception2-test','rds-schulte-test','rds-ballcoordination-test','rds-900coordination-test',
   'rds-lightsreaction-test','rds-memorycards-test','rds-reactiontrial-test','rds-circuit-test','rds-squares-test','rds-reactionkarate-test','rds-memorytouch-test','rds-reactiontenis-test'];
 function prepareApp(slug){
   return new Promise(function(resolve){
@@ -988,6 +989,18 @@ var APP_ADAPTERS=[
     ],
     dimLabel:function(v){ return 'Normal, '+(v.total||'x1'); },
     buildMatch:function(v){ return { mode:'normal', stim:'a', total:String(v.total||'x1') }; } },
+  { slug:'rds-schulte-test', name:'Schulte Perception',
+    collection:'scores_schulte', match:{mode:'normal', stim:'sec', total:'5x5'},
+    metric:'avg', better:'lower', unidad:'ms', inClasif:true,
+    /* v82 (2026-11-24): app nueva (tabla de Schulte). Clasificacion = Normal, Secuencia, 5x5; puntua por el tiempo medio en encontrar cada numero (menor = mejor).
+       Valores como CADENAS: stim 'sec'/'ran' (Limite 'A'/'B' = opcion de tiempo), total '3x3'/'4x4'/'5x5'/'10x10'. Limite (numeros encontrados) no se ofrece aqui. Puntua en Percepcion (Perfil). */
+    dims:[
+      { key:'mode', label:'Modo', def:'normal', options:[ {value:'normal',label:'Normal'},{value:'extremo',label:'Extremo'} ] },
+      { key:'stim', label:'Orden', def:'sec', options:[ {value:'sec',label:'Secuencia'},{value:'ran',label:'Random'} ] },
+      { key:'total', label:'Rejilla', def:'5x5', options:[ {value:'3x3',label:'3x3'},{value:'4x4',label:'4x4'},{value:'5x5',label:'5x5'},{value:'10x10',label:'10x10'} ] }
+    ],
+    dimLabel:function(v){ return ({normal:'Normal',extremo:'Extremo'}[v.mode||'normal'])+', '+({sec:'Secuencia',ran:'Random'}[v.stim||'sec'])+', '+(v.total||'5x5'); },
+    buildMatch:function(v){ return { mode:v.mode||'normal', stim:v.stim||'sec', total:String(v.total||'5x5') }; } },
   { slug:'rds-perception2-test', name:'Perception 2',
     collection:'scores_perception2', match:{mode:'normal', stim:'3x3', total:'10'},
     metric:'avg', better:'lower', unidad:'ms', inClasif:true,
@@ -1301,6 +1314,7 @@ var CLASIF_MODES={
   'rds-processing-test':{ extremo:clMode({mode:'extremo',stim:'cambia',total:15}), limite:clMode({mode:'limite',stim:'cambia',total:15},CL_ENS) },
   'rds-processing3-test':{ extremo:clMode({mode:'extremo',stim:'cambia',total:15}), limite:clMode({mode:'limite',stim:'cambia',total:15},CL_ENS) },
   'rds-squares-test':{ extremo:clMode({mode:'extremo',stim:'a',total:'x1'}), limite:clMode({mode:'limite',stim:'a',total:'0'},CL_ENS) },
+  'rds-schulte-test':{ extremo:clMode({mode:'extremo',stim:'sec',total:'5x5'}), limite:clMode({mode:'limite',stim:'A',total:'10x10'},CL_ENS) },   /* v82: Limite con la opcion A de tiempo mientras se prueba */
   'rds-perception2-test':{ extremo:clMode({mode:'extremo',stim:'3x3',total:'10'}), limite:clMode({mode:'limite',stim:'3x3',total:'0'},CL_ENS) },
   'rds-processing2-test':{ extremo:clMode({mode:'extremo',stim:'estatico',total:25}), limite:clMode({mode:'limite',stim:'estatico',total:25}) },
   'rds-circuit-test':{ extremo:clMode({s1:'ext',s2:'lem',s3:'3'}), limite:clMode({s1:'lim',s2:'lem',s3:'3'}) },
@@ -1678,7 +1692,7 @@ function paintClasificacion(list, meta){
 var PERFIL_TOP=3, PERFIL_MIN_N=10;
 var PERFIL_AREAS=[
   { key:'reaccion',      label:'Reacción',                  short:'Reacción',      apps:{ 'rds-reaction-test':1, 'rds-lightsreaction-test':1, 'rds-squares-test':1, 'rds-reactionkarate-test':0.4 } },
-  { key:'percepcion',    label:'Percepción',                short:'Percepción',    apps:{ 'rds-perception-test':1, 'rds-perception2-test':1, 'rds-processing3-test':1 } },
+  { key:'percepcion',    label:'Percepción',                short:'Percepción',    apps:{ 'rds-perception-test':1, 'rds-perception2-test':1, 'rds-processing3-test':1, 'rds-schulte-test':1 } },
   { key:'procesamiento', label:'Procesamiento y decisión',  short:'Procesamiento', apps:{ 'rds-processing-test':1, 'rds-processing2-test':1, 'rds-processing3-test':1, 'rds-reactiontrial-test':1 } },
   { key:'memoria',       label:'Memoria',                   short:'Memoria',       apps:{ 'rds-memorycards-test':1, 'rds-memorytouch-test':1 } },
   { key:'coordinacion',  label:'Coordinación óculo-manual', short:'Coordinación',  apps:{ 'rds-ballcoordination-test':1, 'rds-900coordination-test':1, 'rds-reactiontenis-test':1, 'rds-reactionkarate-test':1, 'rds-reactiontrial-test':0.5, 'rds-circuit-test':1, 'rds-squares-test':0.4, 'rds-lightsreaction-test':0.4 } }
