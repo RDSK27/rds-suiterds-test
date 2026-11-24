@@ -321,7 +321,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v80</div>
+    <div class="app-ver">v81</div>
   </footer>
 
 </div>
@@ -1290,6 +1290,9 @@ function clEnsFmt(d){ return (d.ensayos||0)+' ac · '+Math.round(d.avg||0)+' ms'
 var CL_ENS={ metric:clEnsMetric, better:'higher', fmt:clEnsFmt, unidad:'aciertos' };
 function clMode(match, extra){ var o={ match:match }; if(extra){ for(var k in extra) o[k]=extra[k]; } return o; }
 var CLASIF_MODES={
+  /* v81 (2026-11-24, Roberto): Velocidad de Reaccion no tiene "Extremo"; en el Ranking Extremo cuenta su modo Go/NoGo (10 rondas, Bajar, sin
+     sonido: Go/NoGo siempre es sin sonido). Su ranking es una coleccion por combinacion, por eso va con col y sin match. Ordena por media. */
+  'rds-reaction-test':{ extremo:{ match:null, col:'scores_reaction_10_gonogo_press_nosound' } },
   'rds-ballcoordination-test':{ extremo:clMode({mode:'extremo',count:15,penaliza:true}),
     limite:clMode({mode:'limite',count:0,penaliza:false},{ metric:function(d){ return (d.trials||0)*100000-(d.avgRT||0); }, better:'higher', unidad:'ensayos',
       fmt:function(d){ return (d.trials||0)+' ens · '+Math.round(d.avgRT||0)+' ms'; } }) },
@@ -1314,6 +1317,7 @@ function clasifLista(mo){
     var m=CLASIF_MODES[a.slug] && CLASIF_MODES[a.slug][mo]; if(!m) return null;
     var c=Object.create(a);
     c.ck=a.slug+'@'+mo; c.clasifMatch=m.match; c.clasifFilter=null;
+    if(m.col) c.clasifCollection=m.col;   /* v81: Reaction (coleccion por combinacion) */
     if(m.metric){ c.clasifMetric=m.metric; c.better=m.better; c.clasifFmt=m.fmt; c.unidad=m.unidad; }
     return c;
   }).filter(Boolean);
