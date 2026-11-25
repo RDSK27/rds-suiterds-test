@@ -321,7 +321,7 @@ if('serviceWorker' in navigator){
 
   <footer>
     SuiteRDS
-    <div class="app-ver">v82</div>
+    <div class="app-ver">v83</div>
   </footer>
 
 </div>
@@ -993,7 +993,7 @@ var APP_ADAPTERS=[
     collection:'scores_schulte', match:{mode:'normal', stim:'sec', total:'5x5'},
     metric:'avg', better:'lower', unidad:'ms', inClasif:true,
     /* v82 (2026-11-24): app nueva (tabla de Schulte). Clasificacion = Normal, Secuencia, 5x5; puntua por el tiempo medio en encontrar cada numero (menor = mejor).
-       Valores como CADENAS: stim 'sec'/'ran' (Limite 'A'/'B' = opcion de tiempo), total '3x3'/'4x4'/'5x5'/'10x10'. Limite (numeros encontrados) no se ofrece aqui. Puntua en Percepcion (Perfil). */
+       Valores como CADENAS: stim 'sec'/'ran' (Limite siempre 'B' = 1 min + 2 s por numero, desde v83), total '3x3'/'4x4'/'5x5'/'10x10'. Limite (numeros encontrados) no se ofrece aqui. Puntua en Percepcion (Perfil). */
     dims:[
       { key:'mode', label:'Modo', def:'normal', options:[ {value:'normal',label:'Normal'},{value:'extremo',label:'Extremo'} ] },
       { key:'stim', label:'Orden', def:'sec', options:[ {value:'sec',label:'Secuencia'},{value:'ran',label:'Random'} ] },
@@ -1314,7 +1314,7 @@ var CLASIF_MODES={
   'rds-processing-test':{ extremo:clMode({mode:'extremo',stim:'cambia',total:15}), limite:clMode({mode:'limite',stim:'cambia',total:15},CL_ENS) },
   'rds-processing3-test':{ extremo:clMode({mode:'extremo',stim:'cambia',total:15}), limite:clMode({mode:'limite',stim:'cambia',total:15},CL_ENS) },
   'rds-squares-test':{ extremo:clMode({mode:'extremo',stim:'a',total:'x1'}), limite:clMode({mode:'limite',stim:'a',total:'0'},CL_ENS) },
-  'rds-schulte-test':{ extremo:clMode({mode:'extremo',stim:'sec',total:'5x5'}), limite:clMode({mode:'limite',stim:'A',total:'10x10'},CL_ENS) },   /* v82: Limite con la opcion A de tiempo mientras se prueba */
+  'rds-schulte-test':{ extremo:clMode({mode:'extremo',stim:'sec',total:'5x5'}), limite:clMode({mode:'limite',stim:'B',total:'10x10'},CL_ENS) },   /* v83: Limite = opcion B (1 min + 2 s por numero), la elegida por Roberto */
   'rds-perception2-test':{ extremo:clMode({mode:'extremo',stim:'3x3',total:'10'}), limite:clMode({mode:'limite',stim:'3x3',total:'0'},CL_ENS) },
   'rds-processing2-test':{ extremo:clMode({mode:'extremo',stim:'estatico',total:25}), limite:clMode({mode:'limite',stim:'estatico',total:25}) },
   'rds-circuit-test':{ extremo:clMode({s1:'ext',s2:'lem',s3:'3'}), limite:clMode({s1:'lim',s2:'lem',s3:'3'}) },
